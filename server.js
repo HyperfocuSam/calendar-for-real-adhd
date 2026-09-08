@@ -18,6 +18,32 @@ const dataFile = page => path.join(DATA_DIR, page === 1 ? 'entries.json' : `entr
 // ---------- storage ----------
 fs.mkdirSync(BACKUP_DIR, { recursive: true });
 
+// First run: seed data/ from data.example/ so the project layout is visible
+// and the canvas has something on it. Sample dates are re-based on today.
+(function seedFromExample() {
+  const EXAMPLE_DIR = path.join(ROOT, 'data.example');
+  if (fs.existsSync(dataFile(1)) || !fs.existsSync(EXAMPLE_DIR)) return;
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  for (const page of PAGES) {
+    const src = path.join(EXAMPLE_DIR, path.basename(dataFile(page)));
+    if (!fs.existsSync(src)) continue;
+    try {
+      const sample = JSON.parse(fs.readFileSync(src, 'utf8')).map(e => {
+        const { daysFromToday, ...rest } = e;
+        if (typeof daysFromToday === 'number') {
+          const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() + daysFromToday);
+          rest.date = iso(d);
+        }
+        return rest;
+      });
+      fs.writeFileSync(dataFile(page), JSON.stringify(sample, null, 2));
+    } catch (e) { console.error('seed failed for page', page, e); }
+  }
+  const s = path.join(EXAMPLE_DIR, 'settings.json');
+  if (fs.existsSync(s) && !fs.existsSync(SETTINGS_FILE)) fs.copyFileSync(s, SETTINGS_FILE);
+  console.log('Seeded data/ from data.example/');
+})();
+
 function readJson(file, fallback) {
   try {
     return JSON.parse(fs.readFileSync(file, 'utf8'));

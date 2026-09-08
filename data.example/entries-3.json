@@ -1,0 +1,47 @@
+[
+  {
+    "id": "sample-invoice-due",
+    "text": "Invoice due",
+    "date": "2026-09-12",
+    "daysFromToday": 4,
+    "x": 120,
+    "y": 80,
+    "createdAt": "2026-09-08T16:11:30.005Z"
+  },
+  {
+    "id": "sample-tax-filing",
+    "text": "Tax filing",
+    "date": "2026-09-06",
+    "daysFromToday": -2,
+    "x": 120,
+    "y": 190,
+    "createdAt": "2026-09-08T16:11:30.005Z"
+  },
+  {
+    "id": "sample-proposal-deadline",
+    "text": "Proposal deadline",
+    "date": "2026-09-18",
+    "daysFromToday": 10,
+    "x": 400,
+    "y": 80,
+    "createdAt": "2026-09-08T16:11:30.005Z"
+  },
+  {
+    "id": "sample-grant-application",
+    "text": "Grant application",
+    "date": "2026-10-03",
+    "daysFromToday": 25,
+    "x": 400,
+    "y": 190,
+    "createdAt": "2026-09-08T16:11:30.005Z"
+  },
+  {
+    "id": "sample-book-manuscript",
+    "text": "Book manuscript",
+    "date": "2027-01-06",
+    "daysFromToday": 120,
+    "x": 700,
+    "y": 80,
+    "createdAt": "2026-09-08T16:11:30.005Z"
+  }
+]

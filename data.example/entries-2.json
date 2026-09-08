@@ -1,0 +1,47 @@
+[
+  {
+    "id": "sample-water-the-plants",
+    "text": "Water the plants",
+    "date": "2026-09-09",
+    "daysFromToday": 1,
+    "x": 120,
+    "y": 80,
+    "createdAt": "2026-09-08T16:11:30.005Z"
+  },
+  {
+    "id": "sample-call-mum",
+    "text": "Call mum",
+    "date": "2026-09-11",
+    "daysFromToday": 3,
+    "x": 120,
+    "y": 190,
+    "createdAt": "2026-09-08T16:11:30.005Z"
+  },
+  {
+    "id": "sample-renew-gym-membership",
+    "text": "Renew gym membership",
+    "date": "2026-09-20",
+    "daysFromToday": 12,
+    "x": 400,
+    "y": 80,
+    "createdAt": "2026-09-08T16:11:30.005Z"
+  },
+  {
+    "id": "sample-back-up-laptop",
+    "text": "Back up laptop",
+    "date": "2026-10-08",
+    "daysFromToday": 30,
+    "x": 400,
+    "y": 190,
+    "createdAt": "2026-09-08T16:11:30.005Z"
+  },
+  {
+    "id": "sample-passport-renewal-window",
+    "text": "Passport renewal window",
+    "date": "2026-11-07",
+    "daysFromToday": 60,
+    "x": 700,
+    "y": 80,
+    "createdAt": "2026-09-08T16:11:30.005Z"
+  }
+]

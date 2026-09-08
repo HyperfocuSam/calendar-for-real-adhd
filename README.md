@@ -76,6 +76,11 @@ the server is running on port 8790. Set `PORT` to change the port.
 `data/` is git-ignored: it holds personal entries and belongs to the machine
 running the server. Back it up like any other personal file.
 
+`data.example/` is committed and mirrors the layout with dummy cards. On the
+first run, if `data/entries.json` does not exist, the server copies the samples
+into `data/` and re-dates them relative to today. Delete the sample cards from
+the page, or `rm -rf data/` and restart for a blank canvas.
+
 ```
 data/
 ├── entries.json        page 1 · Event
@@ -114,6 +119,7 @@ GET    /api/health           counts per page + settings
 ```
 index.html                  the whole frontend (no build step)
 server.js                   backend + static server
+data.example/               dummy data, seeded into data/ on first run
 start.command               macOS launcher
 install-autostart.command   macOS Launch Agent installer
 ```
