@@ -1,0 +1,5 @@
+# Personal data lives only on this machine (see README)
+data/
+!data/.gitkeep
+.DS_Store
+*.log

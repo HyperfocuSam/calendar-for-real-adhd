@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TodoCanva</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+    background: #fff;
+    color: #000;
+    overflow: hidden;
+  }
+
+  /* The whole page is the canvas; entries can be dragged anywhere on it. */
+  #canvas { position: absolute; inset: 0; }
+
+  /* Entry = rectangular card */
+  .entry {
+    position: absolute;
+    width: 180px;
+    padding: 10px 12px;
+    border: 1.5px solid currentColor;
+    border-radius: 6px;
+    background: #fff;
+    font-size: 14px;
+    line-height: 1.35;
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+    animation: float var(--dur, 6s) ease-in-out infinite alternate;
+    animation-delay: var(--delay, 0s);
+  }
+  body.still .entry { animation: none; }
+  .entry.dragging {
+    animation: none;
+    cursor: grabbing;
+    z-index: 10;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+  }
+  .entry .text {
+    display: block;
+    overflow-wrap: anywhere;
+    max-height: 5.4em;           /* 4 lines */
+    overflow: hidden;
+  }
+  .entry .date {
+    display: block;
+    font-size: 11px;
+    font-weight: 400;
+    opacity: 0.7;
+    margin-top: 6px;
+  }
+  .entry.soon  { color: #d40000; font-weight: 700; }
+  .entry.later { color: #000; }
+  .entry.far   { color: #555; }
+  .entry .del {
+    position: absolute; top: 2px; right: 6px;
+    opacity: 0; cursor: pointer; font-size: 13px; font-weight: 400; color: #999;
+  }
+  .entry:hover .del { opacity: 1; }
+
+  @keyframes float {
+    from { transform: translate(var(--dx0), var(--dy0)); }
+    to   { transform: translate(var(--dx1), var(--dy1)); }
+  }
+
+  /* Shared pill-button look */
+  .pill {
+    font: 600 13px/1 inherit;
+    letter-spacing: 0.12em;
+    padding: 12px 22px;
+    border: 2px solid #000;
+    background: #fff;
+    color: #000;
+    cursor: pointer;
+    border-radius: 999px;
+    z-index: 5;
+  }
+  .pill:hover { background: #000; color: #fff; }
+  .pill:disabled { opacity: 0.5; cursor: default; }
+
+  /* LOG button, dead centre */
+  #log {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 18px;
+    letter-spacing: 0.15em;
+    padding: 18px 40px;
+  }
+
+  /* SAVE, bottom-left */
+  #save { position: fixed; left: 20px; bottom: 20px; }
+  #save.dirty { background: #000; color: #fff; }
+  #save.dirty::after { content: ' •'; }
+  #save.saved { border-color: #1a7f37; color: #1a7f37; background: #fff; }
+
+  /* FLOAT toggle, bottom-right */
+  #float { position: fixed; right: 20px; bottom: 20px; }
+  #float.off { color: #777; border-color: #777; border-style: dashed; }
+  #float.off:hover { background: #777; color: #fff; }
+
+  /* Page title, top-left */
+  #title {
+    position: fixed; left: 20px; top: 18px;
+    font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: #555; user-select: none; z-index: 5;
+  }
+  #title b { color: #000; margin-right: 8px; }
+
+  /* Page switcher, top-right */
+  #pages {
+    position: fixed; right: 20px; top: 14px;
+    display: flex; gap: 4px; z-index: 5;
+    border: 1.5px solid #000; border-radius: 999px; padding: 3px;
+    background: #fff;
+  }
+  #pages button {
+    width: 26px; height: 26px; border-radius: 50%;
+    border: none; background: transparent; color: #000;
+    font: 600 12px/1 inherit; cursor: pointer;
+  }
+  #pages button:hover { background: #eee; }
+  #pages button.active { background: #000; color: #fff; }
+
+  /* Connection status banner */
+  #status {
+    position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
+    font-size: 12px; padding: 6px 12px; border-radius: 999px;
+    background: #fff3cd; color: #7a5a00; border: 1px solid #f0d78a;
+    display: none; z-index: 5;
+  }
+  #status.show { display: block; }
+
+  /* Prompt dialog */
+  #overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.35);
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 20;
+  }
+  #overlay.open { display: flex; }
+  #dialog {
+    background: #fff;
+    padding: 24px;
+    width: 320px;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  #dialog label { font-size: 12px; color: #555; display: block; margin-bottom: 4px; }
+  #dialog input, #dialog textarea {
+    width: 100%; font-size: 16px; padding: 10px;
+    border: 1px solid #ccc; border-radius: 8px; font-family: inherit;
+  }
+  #dialog textarea { resize: vertical; min-height: 64px; }
+  #dialog .row { display: flex; gap: 8px; justify-content: flex-end; }
+  #dialog button {
+    font-size: 14px; padding: 8px 16px; border-radius: 8px;
+    border: 1px solid #000; background: #fff; cursor: pointer;
+  }
+  #dialog button.primary { background: #000; color: #fff; }
+</style>
+</head>
+<body>
+
+<div id="canvas"></div>
+<div id="title"><b>1</b>Event</div>
+<div id="pages">
+  <button data-page="1" class="active">1</button>
+  <button data-page="2">2</button>
+  <button data-page="3">3</button>
+</div>
+<button id="log" class="pill">LOG</button>
+<button id="save" class="pill">SAVE</button>
+<button id="float" class="pill" title="Toggle the gentle floating motion">FLOAT ON</button>
+<div id="status"></div>
+
+<div id="overlay">
+  <form id="dialog">
+    <div>
+      <label for="text">Something</label>
+      <textarea id="text" required placeholder="What is it?"></textarea>
+    </div>
+    <div>
+      <label for="date">Day</label>
+      <input id="date" type="date" required>
+    </div>
+    <div class="row">
+      <button type="button" id="cancel">Cancel</button>
+      <button type="submit" class="primary">Add</button>
+    </div>
+  </form>
+</div>
+
+<script>
+(() => {
+  // When opened as a file:// page there is no origin, so talk to the local server directly.
+  const BASE = location.protocol === 'file:' ? 'http://localhost:8790' : '';
+  const PAGE_NAMES = { 1: 'Event', 2: 'Reminders', 3: 'Deadlines' };
+
+  const canvas   = document.getElementById('canvas');
+  const logBtn   = document.getElementById('log');
+  const saveBtn  = document.getElementById('save');
+  const floatBtn = document.getElementById('float');
+  const titleEl  = document.getElementById('title');
+  const pagesEl  = document.getElementById('pages');
+  const overlay  = document.getElementById('overlay');
+  const dialog   = document.getElementById('dialog');
+  const textIn   = document.getElementById('text');
+  const dateIn   = document.getElementById('date');
+  const status   = document.getElementById('status');
+
+  const FLOAT_AMP = 6;     // max px drift in the float animation
+  const GAP = 10;          // extra gap between cards
+  const EDGE = 16;         // keep-out margin from the window edge
+  const DAY = 86400000;
+
+  let page = 1;            // current canvas (1, 2 or 3)
+  let entries = [];        // { id, text, date, x?, y? }
+  let dirty = false;
+  const moved = new Map(); // id -> {x,y} dragged locally but not yet saved
+  let settings = { floating: true };
+
+  // ---------- helpers ----------
+  const cacheKey = () => `todocanva.cache.${page}`;
+  function setStatus(msg) {
+    status.textContent = msg || '';
+    status.classList.toggle('show', !!msg);
+  }
+  function setDirty(v) {
+    dirty = v;
+    saveBtn.classList.toggle('dirty', v);
+    if (v) saveBtn.classList.remove('saved');
+  }
+  function cache() { localStorage.setItem(cacheKey(), JSON.stringify(entries)); }
+  const hasPos = e => typeof e.x === 'number' && typeof e.y === 'number';
+
+  function todayMidnight() { const d = new Date(); d.setHours(0,0,0,0); return d; }
+  function localISO(d) {
+    const p = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+  }
+  function daysFromToday(iso) {
+    const [y,m,d] = iso.split('-').map(Number);
+    return Math.round((new Date(y, m-1, d) - todayMidnight()) / DAY);
+  }
+  // soon: within 7 days of today (includes overdue) | later: 8–30 days | far: >30 days
+  function frame(iso) {
+    const n = daysFromToday(iso);
+    if (n <= 7)  return 'soon';
+    if (n <= 30) return 'later';
+    return 'far';
+  }
+
+  // ---------- API ----------
+  async function request(url, method, body) {
+    const res = await fetch(BASE + url, {
+      method,
+      headers: body ? { 'Content-Type': 'application/json' } : {},
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
+    return res.json();
+  }
+  const api = (method, path = '', body) => request(`/api/entries${path}?page=${page}`, method, body);
+
+  async function loadEntries() {
+    try {
+      const fresh = await api('GET');
+      // Keep unsaved local moves on top of whatever the server has, so a refresh
+      // never loses a drag and never hides records added in another window.
+      fresh.forEach(e => { const m = moved.get(e.id); if (m) { e.x = m.x; e.y = m.y; } });
+      entries = fresh;
+      cache();
+      setStatus('');
+    } catch (e) {
+      try { entries = JSON.parse(localStorage.getItem(cacheKey())) || []; } catch { entries = []; }
+      setStatus('Backend not reachable. Showing cached data. Start the server with start.command, then open http://localhost:8790');
+    }
+    render();
+  }
+
+  async function addEntry(text, date) {
+    try {
+      const saved = await api('POST', '', { text, date });
+      entries.push(saved);
+      cache(); render();
+    } catch (e) {
+      alert('Could not save: ' + e.message + '\nIs the server running?');
+    }
+  }
+
+  async function deleteEntry(id) {
+    try {
+      await api('DELETE', '/' + encodeURIComponent(id));
+      entries = entries.filter(x => x.id !== id);
+      moved.delete(id);
+      cache(); render();
+    } catch (e) {
+      alert('Could not delete: ' + e.message);
+    }
+  }
+
+  // Quietly persist positions the layout engine just assigned, so a card is placed
+  // once and then stays exactly where it is on every reload.
+  async function persistPositions(list) {
+    if (!list.length) return;
+    try {
+      await api('PUT', '', list.map(e => ({ id: e.id, text: e.text, date: e.date, x: e.x, y: e.y })));
+      cache();
+    } catch (e) { /* offline: positions are kept in the cache and saved on the next SAVE */ }
+  }
+
+  // SAVE: push the whole canvas (every card's text, date and position) to the backend.
+  async function saveAll() {
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'SAVING…';
+    try {
+      entries = await api('PUT', '', entries.map(e => ({ id: e.id, text: e.text, date: e.date, x: e.x, y: e.y })));
+      moved.clear();
+      cache();
+      setDirty(false);
+      render();
+      saveBtn.textContent = 'SAVED';
+      saveBtn.classList.add('saved');
+      setTimeout(() => { saveBtn.textContent = 'SAVE'; saveBtn.classList.remove('saved'); }, 1500);
+    } catch (e) {
+      saveBtn.textContent = 'SAVE';
+      alert('Could not save: ' + e.message + '\nIs the server running?');
+    } finally {
+      saveBtn.disabled = false;
+    }
+  }
+  saveBtn.addEventListener('click', saveAll);
+  document.addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') { e.preventDefault(); saveAll(); }
+  });
+  window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+  // ---------- settings: floating on/off ----------
+  function applyFloating() {
+    document.body.classList.toggle('still', !settings.floating);
+    floatBtn.textContent = settings.floating ? 'FLOAT ON' : 'FLOAT OFF';
+    floatBtn.classList.toggle('off', !settings.floating);
+    localStorage.setItem('todocanva.settings', JSON.stringify(settings));
+  }
+  async function loadSettings() {
+    try { settings = await request('/api/settings', 'GET'); }
+    catch { try { settings = JSON.parse(localStorage.getItem('todocanva.settings')) || settings; } catch {} }
+    applyFloating();
+  }
+  floatBtn.addEventListener('click', async () => {
+    settings.floating = !settings.floating;
+    applyFloating();
+    try { settings = await request('/api/settings', 'PUT', { floating: settings.floating }); applyFloating(); }
+    catch { /* offline: remembered locally, synced when the server is back */ }
+  });
+
+  // ---------- pages ----------
+  function pageFromHash() {
+    const n = Number((location.hash || '').replace('#', ''));
+    return PAGE_NAMES[n] ? n : 1;
+  }
+  function applyPage(n) {
+    page = n;
+    titleEl.innerHTML = `<b>${n}</b>${PAGE_NAMES[n]}`;
+    document.title = `TodoCanva · ${PAGE_NAMES[n]}`;
+    pagesEl.querySelectorAll('button').forEach(b => b.classList.toggle('active', Number(b.dataset.page) === n));
+  }
+  function switchPage(n) {
+    if (n === page) return;
+    if (dirty && !confirm('You have unsaved moves on this page. Leave without saving?')) return;
+    moved.clear(); setDirty(false);
+    if (location.hash !== '#' + n) location.hash = '#' + n;   // triggers hashchange -> load
+    else { applyPage(n); loadEntries(); }
+  }
+  pagesEl.addEventListener('click', e => {
+    const b = e.target.closest('button[data-page]');
+    if (b) switchPage(Number(b.dataset.page));
+  });
+  window.addEventListener('hashchange', () => { applyPage(pageFromHash()); loadEntries(); });
+  document.addEventListener('keydown', e => {
+    if (overlay.classList.contains('open')) return;
+    if (['1','2','3'].includes(e.key) && !e.metaKey && !e.ctrlKey && !e.altKey) switchPage(Number(e.key));
+  });
+
+  // ---------- dialog ----------
+  logBtn.addEventListener('click', () => {
+    textIn.value = '';
+    dateIn.value = localISO(todayMidnight());
+    overlay.classList.add('open');
+    textIn.focus();
+  });
+  document.getElementById('cancel').addEventListener('click', close);
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  function close() { overlay.classList.remove('open'); }
+
+  dialog.addEventListener('submit', e => {
+    e.preventDefault();
+    const text = textIn.value.trim();
+    const date = dateIn.value;
+    if (!text || !date) return;
+    close();
+    addEntry(text, date);
+  });
+  textIn.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); dialog.requestSubmit(); }
+  });
+
+  // ---------- geometry ----------
+  // Rects are in canvas coordinates and already include the float margin + gap.
+  function overlaps(r, list) {
+    return list.some(o =>
+      r.x < o.x + o.w && r.x + r.w > o.x &&
+      r.y < o.y + o.h && r.y + r.h > o.y);
+  }
+  function bounds() {
+    return { W: canvas.clientWidth, H: canvas.clientHeight };
+  }
+  function obstacles() {
+    // Fixed UI the cards must never sit on top of.
+    return [logBtn, saveBtn, floatBtn, titleEl, pagesEl, status]
+      .filter(el => el === logBtn || el.offsetParent !== null)
+      .map(el => {
+        const r = el.getBoundingClientRect();
+        return { x: r.left - GAP, y: r.top - GAP, w: r.width + GAP*2, h: r.height + GAP*2 };
+      });
+  }
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+  // Nearest free spot to (x,y), searched in a growing spiral. Never returns an overlap
+  // unless the canvas is completely full.
+  function nearestFree(x, y, w, h, taken, W, H) {
+    const maxX = Math.max(EDGE, W - w - EDGE), maxY = Math.max(EDGE, H - h - EDGE);
+    x = clamp(x, EDGE, maxX); y = clamp(y, EDGE, maxY);
+    if (!overlaps({ x, y, w, h }, taken)) return { x, y };
+    const step = 8;
+    for (let r = step; r < Math.max(W, H); r += step) {
+      const n = Math.max(8, Math.floor(2 * Math.PI * r / step));
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * 2 * Math.PI;
+        const cx = clamp(Math.round(x + r * Math.cos(a)), EDGE, maxX);
+        const cy = clamp(Math.round(y + r * Math.sin(a)), EDGE, maxY);
+        if (!overlaps({ x: cx, y: cy, w, h }, taken)) return { x: cx, y: cy };
+      }
+    }
+    return { x, y };
+  }
+
+  // Auto-placement for cards with no saved position: random spot in the group's zone
+  // (upper half of the page), widening until a free spot appears.
+  function autoSpot(zone, w, h, taken, W, H) {
+    const top = 56, bottom = H / 2 - 60;   // below the top bar, above the LOG button
+    const tryRandom = (x0, x1, y0, y1, tries) => {
+      const sx = Math.max(0, x1 - x0 - w), sy = Math.max(0, y1 - y0 - h);
+      for (let i = 0; i < tries; i++) {
+        const r = { x: x0 + Math.random()*sx, y: y0 + Math.random()*sy, w, h };
+        if (!overlaps(r, taken)) return r;
+      }
+      return null;
+    };
+    return tryRandom(zone.x0, zone.x1, top, bottom, 300)
+        || tryRandom(Math.max(EDGE, zone.x0 - W*0.15), Math.min(W - EDGE, zone.x1 + W*0.15), top, bottom, 300)
+        || tryRandom(EDGE, W - EDGE, top, bottom, 300)
+        || nearestFree((zone.x0 + zone.x1) / 2, bottom / 2, w, h, taken, W, H);
+  }
+
+  // ---------- render ----------
+  function render() {
+    canvas.innerHTML = '';
+    const { W, H } = bounds();
+    const taken = obstacles();
+    const M = FLOAT_AMP + GAP / 2;                 // margin around each card box
+
+    const els = new Map();
+    entries.forEach(en => { const el = makeEl(en); canvas.appendChild(el); els.set(en.id, el); });
+
+    // 1. Cards with a remembered position go exactly there. They are only nudged if the
+    //    window is now too small or something overlaps, and that nudge is NOT saved, so
+    //    the remembered position survives.
+    entries.filter(hasPos).forEach(en => {
+      const el = els.get(en.id);
+      const w = el.offsetWidth + M*2, h = el.offsetHeight + M*2;
+      const p = nearestFree(en.x - M, en.y - M, w, h, taken, W, H);
+      taken.push({ x: p.x, y: p.y, w, h });
+      place(el, p.x + M, p.y + M);
+    });
+
+    // 2. Cards without a position (brand new) are grouped by date frame:
+    //    soon (left), later (middle), far (right). Their spot is then remembered.
+    const fresh = entries.filter(e => !hasPos(e));
+    const groups = { soon: [], later: [], far: [] };
+    fresh.forEach(en => groups[frame(en.date)].push(en));
+    const order = ['soon', 'later', 'far'];
+    const usable = W - EDGE*2;
+    const counts = order.map(k => groups[k].length);
+    const total = counts.reduce((a,b) => a+b, 0);
+    if (total) {
+      const shares = counts.map(c => c === 0 ? 0 : Math.max(0.2, c / total));
+      const sum = shares.reduce((a,b) => a+b, 0);
+      let x = EDGE;
+      const zones = {};
+      order.forEach((k, i) => {
+        const wZone = usable * shares[i] / sum;
+        zones[k] = { x0: x, x1: x + wZone };
+        x += wZone;
+      });
+      order.forEach(k => {
+        groups[k].sort((a,b) => daysFromToday(a.date) - daysFromToday(b.date)).forEach(en => {
+          const el = els.get(en.id);
+          const w = el.offsetWidth + M*2, h = el.offsetHeight + M*2;
+          const p = autoSpot(zones[k], w, h, taken, W, H);
+          taken.push({ x: p.x, y: p.y, w, h });
+          place(el, p.x + M, p.y + M);
+          en.x = Math.round(p.x + M); en.y = Math.round(p.y + M);
+        });
+      });
+      persistPositions(fresh);
+    }
+  }
+
+  function place(el, x, y) {
+    el.style.left = x + 'px';
+    el.style.top  = y + 'px';
+    el._pos = { x, y };
+  }
+
+  function makeEl(en) {
+    const el = document.createElement('div');
+    el.className = 'entry ' + frame(en.date);
+    const rnd = (a, b) => (a + Math.random()*(b-a)).toFixed(1);
+    el.style.setProperty('--dx0', rnd(-FLOAT_AMP, FLOAT_AMP) + 'px');
+    el.style.setProperty('--dy0', rnd(-FLOAT_AMP, FLOAT_AMP) + 'px');
+    el.style.setProperty('--dx1', rnd(-FLOAT_AMP, FLOAT_AMP) + 'px');
+    el.style.setProperty('--dy1', rnd(-FLOAT_AMP, FLOAT_AMP) + 'px');
+    el.style.setProperty('--dur', rnd(4, 9) + 's');
+    el.style.setProperty('--delay', '-' + rnd(0, 9) + 's');
+
+    const text = document.createElement('span');
+    text.className = 'text';
+    text.textContent = en.text;
+    text.title = en.text;
+    const date = document.createElement('span');
+    date.className = 'date';
+    const n = daysFromToday(en.date);
+    const rel = n === 0 ? 'today' : n === 1 ? 'tomorrow' : n < 0 ? `${-n}d overdue` : `in ${n}d`;
+    date.textContent = `${en.date} · ${rel}`;
+    const del = document.createElement('span');
+    del.className = 'del';
+    del.textContent = '×';
+    del.title = 'Remove';
+    del.addEventListener('pointerdown', e => e.stopPropagation());
+    del.addEventListener('click', e => { e.stopPropagation(); deleteEntry(en.id); });
+    el.append(text, date, del);
+
+    enableDrag(el, en);
+    return el;
+  }
+
+  // ---------- drag ----------
+  function enableDrag(el, en) {
+    let start = null;
+    el.addEventListener('pointerdown', e => {
+      if (e.button !== 0) return;
+      el.setPointerCapture(e.pointerId);
+      start = { px: e.clientX, py: e.clientY, x: el._pos.x, y: el._pos.y, moved: false };
+      el.classList.add('dragging');
+    });
+    el.addEventListener('pointermove', e => {
+      if (!start) return;
+      const dx = e.clientX - start.px, dy = e.clientY - start.py;
+      if (Math.abs(dx) + Math.abs(dy) > 2) start.moved = true;
+      const { W, H } = bounds();
+      const x = clamp(start.x + dx, EDGE, W - el.offsetWidth - EDGE);
+      const y = clamp(start.y + dy, EDGE, H - el.offsetHeight - EDGE);
+      el.style.left = x + 'px';
+      el.style.top  = y + 'px';
+    });
+    const finish = () => {
+      if (!start) return;
+      el.classList.remove('dragging');
+      const wasMoved = start.moved;
+      start = null;
+      if (!wasMoved) return;
+      // Settle: resolve any overlap with other cards or the buttons.
+      const { W, H } = bounds();
+      const M = FLOAT_AMP + GAP / 2;
+      const w = el.offsetWidth + M*2, h = el.offsetHeight + M*2;
+      const taken = obstacles();
+      canvas.querySelectorAll('.entry').forEach(o => {
+        if (o !== el) taken.push({ x: o._pos.x - M, y: o._pos.y - M, w: o.offsetWidth + M*2, h: o.offsetHeight + M*2 });
+      });
+      const p = nearestFree(parseFloat(el.style.left) - M, parseFloat(el.style.top) - M, w, h, taken, W, H);
+      place(el, p.x + M, p.y + M);
+      en.x = Math.round(p.x + M); en.y = Math.round(p.y + M);
+      moved.set(en.id, { x: en.x, y: en.y });
+      cache();
+      setDirty(true);
+    };
+    el.addEventListener('pointerup', finish);
+    el.addEventListener('pointercancel', finish);
+  }
+
+  // ---------- boot ----------
+  let resizeTimer;
+  window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(render, 150); });
+  window.addEventListener('focus', loadEntries);
+  setInterval(loadEntries, 60 * 1000);   // pick up changes made in another window
+  applyPage(pageFromHash());
+  loadSettings();
+  loadEntries();
+})();
+</script>
+</body>
+</html>
