@@ -8,4 +8,5 @@ else
   nohup node server.js > data/server.log 2>&1 &
   sleep 1
 fi
-open "http://localhost:$PORT"
+# Open the file, not http://localhost:$PORT — that origin is not this app.
+open "file://$(pwd)/index.html"

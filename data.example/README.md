@@ -14,6 +14,8 @@ entries.json      page 1 · Event
 entries-2.json    page 2 · Reminders
 entries-3.json    page 3 · Deadlines
 settings.json     { "floating": true }
-backups/          pageN-YYYY-MM-DD.json copies, written daily by the server
+backups/          pageN-YYYY-MM-DD.json and done-YYYY-MM-DD.json, written daily
 server.log        written by start.command / the Launch Agent
 ```
+
+`done.json` is created on the first crossed-out card and is not seeded.

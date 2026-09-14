@@ -20,7 +20,15 @@ Three separate canvases, a tiny Node backend, and nothing else.
 3. New cards are auto-placed in clusters by date frame (soon on the left, later in
    the middle, far on the right). Cards never overlap.
 4. Drag any card anywhere. Press **SAVE** (bottom-left, or Cmd/Ctrl+S) to store the
-   new positions. Hover a card and click **×** to remove it.
+   new positions. Hover a card and click **×** to mark it done — it leaves the
+   canvas and goes to the **CLOCK** list.
+
+### Done (CLOCK)
+
+**CLOCK** (bottom-right, left of FLOAT) opens a shared list of every crossed-out
+card from all three pages. Each row shows the original page name, **REVERT**
+(puts the card back on that page at its last position), and **×** (throws it
+away for good). Nothing is confirmed; same as the old canvas ×.
 
 ### Pages
 
@@ -46,12 +54,17 @@ cards. The choice is stored in `data/settings.json` and applies to every page.
 ## Dependability
 
 - The backend (`server.js`, Node 18+, zero dependencies) is the source of truth.
-  Every add, delete and save is written to disk straight away.
+  Every add, done, revert, delete and save is written to disk straight away.
 - Writes go to a temp file and are renamed into place, so a crash mid-write can
   never corrupt the data file. A corrupt file is moved aside, never overwritten.
-- A dated copy of each page is kept in `data/backups/` (last 30 days per page).
+- A dated copy of each page and of `done.json` is kept in `data/backups/` (last
+  30 days each).
 - Bulk save is an upsert: it never deletes records, so a stale browser tab cannot
-  wipe cards that were added elsewhere. Deleting is only done card by card.
+  wipe cards that were added elsewhere. Crossing out moves a card to the archive;
+  throwing one away is only done from the CLOCK list, row by row.
+- Mark-done writes the archive first, then removes the live card. Revert writes
+  the live card first, then drops the archive row. A crash cannot lose an item
+  from both files.
 - The page keeps a read-only cache in the browser and shows a banner if the
   server is down, so you can still see your cards.
 
@@ -68,8 +81,9 @@ On macOS:
   that starts the server at login and restarts it if it crashes. Remove with
   `launchctl bootout gui/$(id -u)/com.sam.todocanva`.
 
-The page also works when opened directly as `index.html` from disk, as long as
-the server is running on port 8790. Set `PORT` to change the port.
+Open **`index.html` from disk** (`file://…`). The page talks to the API on
+port 8790; that HTTP origin is not the app (another local project may already
+own it in the browser). Set `PORT` to change the port.
 
 ## Data
 
@@ -86,8 +100,9 @@ data/
 ├── entries.json        page 1 · Event
 ├── entries-2.json      page 2 · Reminders
 ├── entries-3.json      page 3 · Deadlines
+├── done.json           shared CLOCK archive (all pages)
 ├── settings.json       { "floating": true }
-├── backups/            pageN-YYYY-MM-DD.json, 30 days per page
+├── backups/            pageN-YYYY-MM-DD.json and done-YYYY-MM-DD.json, 30 days
 └── server.log
 ```
 
@@ -109,9 +124,13 @@ POST   /api/entries          { "text", "date": "YYYY-MM-DD", "x"?, "y"? }
 PUT    /api/entries          [ ...entries ]   bulk upsert (never deletes)
 PUT    /api/entries/:id      { "text"?, "date"?, "x"?, "y"? }
 DELETE /api/entries/:id
+POST   /api/entries/:id/done { "x"?, "y"? }   move live card into done.json
+GET    /api/done             newest first; each row includes "page"
+POST   /api/done/:id/revert  restore to original page at saved x,y
+DELETE /api/done/:id         throw away for good
 GET    /api/settings         { "floating": true }
 PUT    /api/settings         { "floating": false }
-GET    /api/health           counts per page + settings
+GET    /api/health           counts per page + done count + settings
 ```
 
 ## Files

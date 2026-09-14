@@ -98,8 +98,18 @@
   #save.dirty::after { content: ' •'; }
   #save.saved { border-color: #1a7f37; color: #1a7f37; background: #fff; }
 
-  /* FLOAT toggle, bottom-right */
-  #float { position: fixed; right: 20px; bottom: 20px; }
+  /* CLOCK + FLOAT, bottom-right */
+  #dock-right {
+    position: fixed; right: 20px; bottom: 20px;
+    display: flex; gap: 8px; z-index: 5;
+  }
+  #clock {
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  #clock svg {
+    width: 14px; height: 14px;
+    stroke: currentColor; fill: none; stroke-width: 2;
+  }
   #float.off { color: #777; border-color: #777; border-style: dashed; }
   #float.off:hover { background: #777; color: #fff; }
 
@@ -164,6 +174,67 @@
     border: 1px solid #000; background: #fff; cursor: pointer;
   }
   #dialog button.primary { background: #000; color: #fff; }
+
+  /* Done list overlay */
+  #done-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.35);
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 20;
+  }
+  #done-overlay.open { display: flex; }
+  #done-dialog {
+    background: #fff;
+    padding: 22px 22px 16px;
+    width: 420px;
+    max-width: calc(100vw - 40px);
+    max-height: 70vh;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  #done-dialog h2 {
+    margin: 0;
+    font-size: 12px; font-weight: 600;
+    letter-spacing: 0.16em; text-transform: uppercase;
+  }
+  #done-list { overflow-y: auto; }
+  #done-list .empty {
+    font-size: 14px; color: #777; padding: 18px 0 10px;
+  }
+  .done-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 0;
+    border-top: 1px solid #eee;
+  }
+  .done-row .txt { flex: 1; min-width: 0; }
+  .done-row .name {
+    display: block;
+    font-size: 14px;
+    text-decoration: line-through;
+    opacity: 0.75;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .done-row .meta { display: block; font-size: 11px; color: #777; margin-top: 2px; }
+  .done-row .revert {
+    flex-shrink: 0;
+    font: 600 11px/1 inherit;
+    letter-spacing: 0.1em;
+    padding: 7px 12px;
+    border: 1.5px solid #000;
+    background: #fff;
+    color: #000;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .done-row .revert:hover { background: #000; color: #fff; }
+  .done-row .del {
+    flex-shrink: 0;
+    cursor: pointer; font-size: 16px; font-weight: 400; color: #999;
+    padding: 4px 6px;
+  }
+  .done-row .del:hover { color: #000; }
 </style>
 </head>
 <body>
@@ -177,7 +248,13 @@
 </div>
 <button id="log" class="pill">LOG</button>
 <button id="save" class="pill">SAVE</button>
-<button id="float" class="pill" title="Toggle the gentle floating motion">FLOAT ON</button>
+<div id="dock-right">
+  <button id="clock" class="pill" title="Done items">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+    CLOCK
+  </button>
+  <button id="float" class="pill" title="Toggle the gentle floating motion">FLOAT ON</button>
+</div>
 <div id="status"></div>
 
 <div id="overlay">
@@ -197,6 +274,13 @@
   </form>
 </div>
 
+<div id="done-overlay">
+  <div id="done-dialog">
+    <h2>Done</h2>
+    <div id="done-list"></div>
+  </div>
+</div>
+
 <script>
 (() => {
   // When opened as a file:// page there is no origin, so talk to the local server directly.
@@ -206,6 +290,7 @@
   const canvas   = document.getElementById('canvas');
   const logBtn   = document.getElementById('log');
   const saveBtn  = document.getElementById('save');
+  const clockBtn = document.getElementById('clock');
   const floatBtn = document.getElementById('float');
   const titleEl  = document.getElementById('title');
   const pagesEl  = document.getElementById('pages');
@@ -214,6 +299,8 @@
   const textIn   = document.getElementById('text');
   const dateIn   = document.getElementById('date');
   const status   = document.getElementById('status');
+  const doneOverlay = document.getElementById('done-overlay');
+  const doneListEl  = document.getElementById('done-list');
 
   const FLOAT_AMP = 6;     // max px drift in the float animation
   const GAP = 10;          // extra gap between cards
@@ -222,6 +309,7 @@
 
   let page = 1;            // current canvas (1, 2 or 3)
   let entries = [];        // { id, text, date, x?, y? }
+  let doneItems = [];      // shared archive { id, text, date, page, doneAt, x?, y? }
   let dirty = false;
   const moved = new Map(); // id -> {x,y} dragged locally but not yet saved
   let settings = { floating: true };
@@ -238,6 +326,7 @@
     if (v) saveBtn.classList.remove('saved');
   }
   function cache() { localStorage.setItem(cacheKey(), JSON.stringify(entries)); }
+  function cacheDone() { localStorage.setItem('todocanva.cache.done', JSON.stringify(doneItems)); }
   const hasPos = e => typeof e.x === 'number' && typeof e.y === 'number';
 
   function todayMidnight() { const d = new Date(); d.setHours(0,0,0,0); return d; }
@@ -295,15 +384,94 @@
     }
   }
 
-  async function deleteEntry(id) {
+  async function loadDone() {
     try {
-      await api('DELETE', '/' + encodeURIComponent(id));
-      entries = entries.filter(x => x.id !== id);
-      moved.delete(id);
-      cache(); render();
+      doneItems = await request('/api/done', 'GET');
+      cacheDone();
+    } catch (e) {
+      try { doneItems = JSON.parse(localStorage.getItem('todocanva.cache.done')) || []; } catch { doneItems = []; }
+    }
+    if (doneOverlay.classList.contains('open')) renderDoneList();
+  }
+
+  async function markDone(en) {
+    try {
+      const body = {};
+      if (typeof en.x === 'number') body.x = en.x;
+      if (typeof en.y === 'number') body.y = en.y;
+      const saved = await request(`/api/entries/${encodeURIComponent(en.id)}/done?page=${page}`, 'POST', body);
+      entries = entries.filter(x => x.id !== en.id);
+      moved.delete(en.id);
+      doneItems = [saved, ...doneItems.filter(x => x.id !== saved.id)];
+      cache(); cacheDone(); render();
+      if (doneOverlay.classList.contains('open')) renderDoneList();
+    } catch (e) {
+      alert('Could not mark done: ' + e.message);
+    }
+  }
+
+  async function revertDone(id) {
+    try {
+      const { page: origin, entry } = await request('/api/done/' + encodeURIComponent(id) + '/revert', 'POST');
+      doneItems = doneItems.filter(x => x.id !== id);
+      cacheDone();
+      renderDoneList();
+      if (origin === page && !entries.some(e => e.id === entry.id)) {
+        entries.push(entry);
+        cache();
+        render();
+      }
+    } catch (e) {
+      alert('Could not revert: ' + e.message);
+    }
+  }
+
+  async function deleteDone(id) {
+    try {
+      await request('/api/done/' + encodeURIComponent(id), 'DELETE');
+      doneItems = doneItems.filter(x => x.id !== id);
+      cacheDone();
+      renderDoneList();
     } catch (e) {
       alert('Could not delete: ' + e.message);
     }
+  }
+
+  function renderDoneList() {
+    doneListEl.innerHTML = '';
+    if (!doneItems.length) {
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = 'Nothing done yet.';
+      doneListEl.appendChild(empty);
+      return;
+    }
+    doneItems.forEach(en => {
+      const row = document.createElement('div');
+      row.className = 'done-row';
+      const txt = document.createElement('div');
+      txt.className = 'txt';
+      const name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = en.text;
+      name.title = en.text;
+      const meta = document.createElement('span');
+      meta.className = 'meta';
+      meta.textContent = `${PAGE_NAMES[en.page] || 'Page ' + en.page} · ${en.date}`;
+      txt.append(name, meta);
+      const rev = document.createElement('button');
+      rev.type = 'button';
+      rev.className = 'revert';
+      rev.textContent = 'REVERT';
+      rev.addEventListener('click', () => revertDone(en.id));
+      const del = document.createElement('span');
+      del.className = 'del';
+      del.textContent = '×';
+      del.title = 'Throw away';
+      del.addEventListener('click', () => deleteDone(en.id));
+      row.append(txt, rev, del);
+      doneListEl.appendChild(row);
+    });
   }
 
   // Quietly persist positions the layout engine just assigned, so a card is placed
@@ -385,7 +553,7 @@
   });
   window.addEventListener('hashchange', () => { applyPage(pageFromHash()); loadEntries(); });
   document.addEventListener('keydown', e => {
-    if (overlay.classList.contains('open')) return;
+    if (overlay.classList.contains('open') || doneOverlay.classList.contains('open')) return;
     if (['1','2','3'].includes(e.key) && !e.metaKey && !e.ctrlKey && !e.altKey) switchPage(Number(e.key));
   });
 
@@ -398,8 +566,21 @@
   });
   document.getElementById('cancel').addEventListener('click', close);
   overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    close();
+    closeDone();
+  });
   function close() { overlay.classList.remove('open'); }
+
+  function openDone() {
+    renderDoneList();
+    doneOverlay.classList.add('open');
+    loadDone();
+  }
+  function closeDone() { doneOverlay.classList.remove('open'); }
+  clockBtn.addEventListener('click', openDone);
+  doneOverlay.addEventListener('click', e => { if (e.target === doneOverlay) closeDone(); });
 
   dialog.addEventListener('submit', e => {
     e.preventDefault();
@@ -425,7 +606,7 @@
   }
   function obstacles() {
     // Fixed UI the cards must never sit on top of.
-    return [logBtn, saveBtn, floatBtn, titleEl, pagesEl, status]
+    return [logBtn, saveBtn, clockBtn, floatBtn, titleEl, pagesEl, status]
       .filter(el => el === logBtn || el.offsetParent !== null)
       .map(el => {
         const r = el.getBoundingClientRect();
@@ -556,7 +737,7 @@
     del.textContent = '×';
     del.title = 'Remove';
     del.addEventListener('pointerdown', e => e.stopPropagation());
-    del.addEventListener('click', e => { e.stopPropagation(); deleteEntry(en.id); });
+    del.addEventListener('click', e => { e.stopPropagation(); markDone(en); });
     el.append(text, date, del);
 
     enableDrag(el, en);
@@ -610,11 +791,12 @@
   // ---------- boot ----------
   let resizeTimer;
   window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(render, 150); });
-  window.addEventListener('focus', loadEntries);
-  setInterval(loadEntries, 60 * 1000);   // pick up changes made in another window
+  window.addEventListener('focus', () => { loadEntries(); loadDone(); });
+  setInterval(() => { loadEntries(); loadDone(); }, 60 * 1000);   // pick up changes made in another window
   applyPage(pageFromHash());
   loadSettings();
   loadEntries();
+  loadDone();
 })();
 </script>
 </body>

@@ -11,6 +11,7 @@ const ROOT = __dirname;
 const DATA_DIR = path.join(ROOT, 'data');
 const BACKUP_DIR = path.join(DATA_DIR, 'backups');
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
+const DONE_FILE = path.join(DATA_DIR, 'done.json');
 const PAGES = [1, 2, 3];
 // Page 1 keeps the original file name so existing data carries over.
 const dataFile = page => path.join(DATA_DIR, page === 1 ? 'entries.json' : `entries-${page}.json`);
@@ -65,6 +66,11 @@ function readSettings() {
   const s = readJson(SETTINGS_FILE, {});
   return { floating: true, ...(s && typeof s === 'object' ? s : {}) };
 }
+function readDone() {
+  const parsed = readJson(DONE_FILE, []);
+  return Array.isArray(parsed) ? parsed : [];
+}
+const writeDone = done => writeJson(DONE_FILE, done);
 
 let writeQueue = Promise.resolve();
 function writeJson(file, value) {
@@ -92,6 +98,12 @@ function dailyBackup() {
       if (!fs.existsSync(dest)) fs.copyFileSync(src, dest);
       // keep the last 30 backups per page
       const files = fs.readdirSync(BACKUP_DIR).filter(f => f.startsWith(`page${page}-`)).sort();
+      files.slice(0, Math.max(0, files.length - 30)).forEach(f => fs.unlinkSync(path.join(BACKUP_DIR, f)));
+    }
+    if (fs.existsSync(DONE_FILE)) {
+      const dest = path.join(BACKUP_DIR, `done-${stamp}.json`);
+      if (!fs.existsSync(dest)) fs.copyFileSync(DONE_FILE, dest);
+      const files = fs.readdirSync(BACKUP_DIR).filter(f => f.startsWith('done-')).sort();
       files.slice(0, Math.max(0, files.length - 30)).forEach(f => fs.unlinkSync(path.join(BACKUP_DIR, f)));
     }
   } catch (e) { console.error('backup failed', e); }
@@ -145,6 +157,88 @@ const server = http.createServer(async (req, res) => {
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
     }); return res.end(); }
+    // Shared done archive (all pages). Specific /done routes before /api/entries.
+    if (url.pathname === '/api/done') {
+      if (req.method === 'GET') {
+        const list = readDone().slice().sort((a, b) => String(b.doneAt || '').localeCompare(String(a.doneAt || '')));
+        return send(res, 200, list);
+      }
+      return send(res, 405, { error: 'method not allowed' });
+    }
+
+    const revertM = url.pathname.match(/^\/api\/done\/([^/]+)\/revert$/);
+    if (revertM) {
+      if (req.method !== 'POST') return send(res, 405, { error: 'method not allowed' });
+      const id = revertM[1];
+      let archive = readDone();
+      const i = archive.findIndex(e => e.id === id);
+      if (i < 0) return send(res, 404, { error: 'not found' });
+      const rec = archive[i];
+      const page = Number(rec.page);
+      if (!PAGES.includes(page)) return send(res, 400, { error: 'invalid page on record' });
+      if (!validEntry(rec)) return send(res, 400, { error: 'invalid' });
+      const restored = {
+        id: rec.id,
+        text: rec.text.trim(),
+        date: rec.date,
+        createdAt: rec.createdAt,
+        updatedAt: new Date().toISOString(),
+      };
+      if (typeof rec.x === 'number') restored.x = rec.x;
+      if (typeof rec.y === 'number') restored.y = rec.y;
+      const entries = readEntries(page);
+      if (!entries.some(e => e.id === id)) entries.push(restored);
+      archive = archive.filter(e => e.id !== id);
+      // Restore live first so a crash cannot drop the card from both files.
+      await writeEntries(page, entries);
+      await writeDone(archive);
+      return send(res, 200, { page, entry: restored });
+    }
+
+    const delDoneM = url.pathname.match(/^\/api\/done\/([^/]+)$/);
+    if (delDoneM) {
+      if (req.method !== 'DELETE') return send(res, 405, { error: 'method not allowed' });
+      const id = delDoneM[1];
+      const archive = readDone();
+      const next = archive.filter(e => e.id !== id);
+      if (next.length === archive.length) return send(res, 404, { error: 'not found' });
+      await writeDone(next);
+      return send(res, 200, { ok: true });
+    }
+
+    const markM = url.pathname.match(/^\/api\/entries\/([^/]+)\/done$/);
+    if (markM) {
+      if (req.method !== 'POST') return send(res, 405, { error: 'method not allowed' });
+      const id = markM[1];
+      const page = Number(url.searchParams.get('page') || 1);
+      if (!PAGES.includes(page)) return send(res, 400, { error: 'page must be 1, 2 or 3' });
+      const body = await readBody(req);
+      let entries = readEntries(page);
+      const found = entries.find(e => e.id === id);
+      if (!found) return send(res, 404, { error: 'not found' });
+      const done = {
+        id: found.id,
+        text: found.text,
+        date: found.date,
+        page,
+        createdAt: found.createdAt,
+        doneAt: new Date().toISOString(),
+      };
+      if (found.updatedAt) done.updatedAt = found.updatedAt;
+      const x = typeof body.x === 'number' ? body.x : found.x;
+      const y = typeof body.y === 'number' ? body.y : found.y;
+      if (typeof x === 'number') done.x = x;
+      if (typeof y === 'number') done.y = y;
+      let archive = readDone();
+      const existing = archive.findIndex(e => e.id === id);
+      if (existing >= 0) archive[existing] = done; else archive.push(done);
+      entries = entries.filter(e => e.id !== id);
+      // Archive first so a crash cannot lose the card.
+      await writeDone(archive);
+      await writeEntries(page, entries);
+      return send(res, 200, done);
+    }
+
     if (m) {
       const id = m[1];
       const page = Number(url.searchParams.get('page') || 1);
@@ -230,7 +324,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/api/health') {
       const counts = {};
       PAGES.forEach(p => counts[p] = readEntries(p).length);
-      return send(res, 200, { ok: true, dir: DATA_DIR, counts, settings: readSettings() });
+      return send(res, 200, { ok: true, dir: DATA_DIR, counts, done: readDone().length, settings: readSettings() });
     }
 
     // Static: only index.html is served.
