@@ -13,15 +13,22 @@ Three separate canvases, a tiny Node backend, and nothing else.
 
    | Days from today | Style |
    |---|---|
-   | 7 or fewer (including overdue) | **bold red** |
+   | overdue | **bold red**, pink fill, dashed border |
+   | today | **white on solid red** |
+   | 1 to 7 | **bold red** |
    | 8 to 30 | black |
    | more than 30 | dark grey |
+
+   The date line shows the weekday (`Wed 2026-09-23 · in 2d`).
 
 3. New cards are auto-placed in clusters by date frame (soon on the left, later in
    the middle, far on the right). Cards never overlap.
 4. Drag any card anywhere. Press **SAVE** (bottom-left, or Cmd/Ctrl+S) to store the
    new positions. Hover a card and click **×** to mark it done — it leaves the
    canvas and goes to the **CLOCK** list.
+5. **Double-click a card** to edit its text or day in place. The edit dialog also
+   has a red **Delete** that throws the card away for good (it does not go to
+   CLOCK).
 
 ### Done (CLOCK)
 

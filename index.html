@@ -54,6 +54,10 @@
     margin-top: 6px;
   }
   .entry.soon  { color: #d40000; font-weight: 700; }
+  .entry.overdue { color: #d40000; font-weight: 700; background: #fff0f0; border-style: dashed; }
+  .entry.today { color: #d40000; font-weight: 700; background: #d40000; color: #fff; border-color: #d40000; }
+  .entry.today .del { color: #fff; opacity: 0.6; }
+  .entry.today .date { opacity: 0.9; }
   .entry.later { color: #000; }
   .entry.far   { color: #555; }
   .entry .del {
@@ -174,6 +178,10 @@
     border: 1px solid #000; background: #fff; cursor: pointer;
   }
   #dialog button.primary { background: #000; color: #fff; }
+  #dialog h2 { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; }
+  #dialog button.danger { border-color: #d40000; color: #d40000; display: none; }
+  #dialog button.danger:hover { background: #d40000; color: #fff; }
+  #dialog.editing button.danger { display: inline-block; }
 
   /* Done list overlay */
   #done-overlay {
@@ -259,6 +267,7 @@
 
 <div id="overlay">
   <form id="dialog">
+    <h2 id="dialog-title">Log</h2>
     <div>
       <label for="text">Something</label>
       <textarea id="text" required placeholder="What is it?"></textarea>
@@ -268,8 +277,10 @@
       <input id="date" type="date" required>
     </div>
     <div class="row">
+      <button type="button" id="dialog-delete" class="danger" title="Delete for good (skips CLOCK)">Delete</button>
+      <span style="flex:1"></span>
       <button type="button" id="cancel">Cancel</button>
-      <button type="submit" class="primary">Add</button>
+      <button type="submit" class="primary" id="dialog-submit">Add</button>
     </div>
   </form>
 </div>
@@ -341,6 +352,8 @@
   // soon: within 7 days of today (includes overdue) | later: 8–30 days | far: >30 days
   function frame(iso) {
     const n = daysFromToday(iso);
+    if (n < 0)   return 'soon overdue';
+    if (n === 0) return 'soon today';
     if (n <= 7)  return 'soon';
     if (n <= 30) return 'later';
     return 'far';
@@ -381,6 +394,27 @@
       cache(); render();
     } catch (e) {
       alert('Could not save: ' + e.message + '\nIs the server running?');
+    }
+  }
+
+  async function updateEntry(en, text, date) {
+    try {
+      const saved = await request(`/api/entries/${encodeURIComponent(en.id)}?page=${page}`, 'PUT', { text, date });
+      Object.assign(en, saved);
+      cache(); render();
+    } catch (e) {
+      alert('Could not update: ' + e.message + '\nIs the server running?');
+    }
+  }
+
+  async function deleteEntry(en) {
+    try {
+      await request(`/api/entries/${encodeURIComponent(en.id)}?page=${page}`, 'DELETE');
+      entries = entries.filter(x => x.id !== en.id);
+      moved.delete(en.id);
+      cache(); render();
+    } catch (e) {
+      alert('Could not delete: ' + e.message);
     }
   }
 
@@ -558,11 +592,28 @@
   });
 
   // ---------- dialog ----------
-  logBtn.addEventListener('click', () => {
-    textIn.value = '';
-    dateIn.value = localISO(todayMidnight());
+  const dialogTitle  = document.getElementById('dialog-title');
+  const dialogSubmit = document.getElementById('dialog-submit');
+  const dialogDelete = document.getElementById('dialog-delete');
+  let editing = null;   // entry being edited, or null when logging a new one
+
+  function openDialog(en) {
+    editing = en || null;
+    dialog.classList.toggle('editing', !!en);
+    dialogTitle.textContent  = en ? 'Edit' : 'Log';
+    dialogSubmit.textContent = en ? 'Save' : 'Add';
+    textIn.value = en ? en.text : '';
+    dateIn.value = en ? en.date : localISO(todayMidnight());
     overlay.classList.add('open');
     textIn.focus();
+    if (en) textIn.select();
+  }
+  logBtn.addEventListener('click', () => openDialog(null));
+  dialogDelete.addEventListener('click', () => {
+    if (!editing) return;
+    const en = editing;
+    close();
+    deleteEntry(en);
   });
   document.getElementById('cancel').addEventListener('click', close);
   overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
@@ -571,7 +622,7 @@
     close();
     closeDone();
   });
-  function close() { overlay.classList.remove('open'); }
+  function close() { overlay.classList.remove('open'); editing = null; dialog.classList.remove('editing'); }
 
   function openDone() {
     renderDoneList();
@@ -587,8 +638,9 @@
     const text = textIn.value.trim();
     const date = dateIn.value;
     if (!text || !date) return;
+    const en = editing;
     close();
-    addEntry(text, date);
+    if (en) updateEntry(en, text, date); else addEntry(text, date);
   });
   textIn.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); dialog.requestSubmit(); }
@@ -677,7 +729,7 @@
     //    soon (left), later (middle), far (right). Their spot is then remembered.
     const fresh = entries.filter(e => !hasPos(e));
     const groups = { soon: [], later: [], far: [] };
-    fresh.forEach(en => groups[frame(en.date)].push(en));
+    fresh.forEach(en => groups[frame(en.date).split(' ')[0]].push(en));
     const order = ['soon', 'later', 'far'];
     const usable = W - EDGE*2;
     const counts = order.map(k => groups[k].length);
@@ -726,12 +778,12 @@
     const text = document.createElement('span');
     text.className = 'text';
     text.textContent = en.text;
-    text.title = en.text;
     const date = document.createElement('span');
     date.className = 'date';
     const n = daysFromToday(en.date);
     const rel = n === 0 ? 'today' : n === 1 ? 'tomorrow' : n < 0 ? `${-n}d overdue` : `in ${n}d`;
-    date.textContent = `${en.date} · ${rel}`;
+    const wd = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(...en.date.split('-').map((v,i)=>i===1?Number(v)-1:Number(v))).getDay()];
+    date.textContent = `${wd} ${en.date} · ${rel}`;
     const del = document.createElement('span');
     del.className = 'del';
     del.textContent = '×';
@@ -739,6 +791,8 @@
     del.addEventListener('pointerdown', e => e.stopPropagation());
     del.addEventListener('click', e => { e.stopPropagation(); markDone(en); });
     el.append(text, date, del);
+    el.title = 'Double-click to edit';
+    el.addEventListener('dblclick', e => { e.preventDefault(); openDialog(en); });
 
     enableDrag(el, en);
     return el;
