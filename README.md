@@ -6,7 +6,7 @@ One white page. One **LOG** button in the middle. Every thing you log becomes a
 card that drifts gently above the button, coloured by how close its day is.
 Red means soon. Black means later. Grey means not yet. That is the whole system.
 
-![Layout](docs/layout.png)
+![Demo: log a card, it drifts, cross it out](docs/demo.gif)
 
 ## Why this exists
 
