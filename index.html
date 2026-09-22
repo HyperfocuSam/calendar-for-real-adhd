@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TodoCanva</title>
+<title>Calendar for Real ADHD</title>
 <style>
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
@@ -326,7 +326,7 @@
   let settings = { floating: true };
 
   // ---------- helpers ----------
-  const cacheKey = () => `todocanva.cache.${page}`;
+  const cacheKey = () => `cfra.cache.${page}`;
   function setStatus(msg) {
     status.textContent = msg || '';
     status.classList.toggle('show', !!msg);
@@ -337,7 +337,7 @@
     if (v) saveBtn.classList.remove('saved');
   }
   function cache() { localStorage.setItem(cacheKey(), JSON.stringify(entries)); }
-  function cacheDone() { localStorage.setItem('todocanva.cache.done', JSON.stringify(doneItems)); }
+  function cacheDone() { localStorage.setItem('cfra.cache.done', JSON.stringify(doneItems)); }
   const hasPos = e => typeof e.x === 'number' && typeof e.y === 'number';
 
   function todayMidnight() { const d = new Date(); d.setHours(0,0,0,0); return d; }
@@ -423,7 +423,7 @@
       doneItems = await request('/api/done', 'GET');
       cacheDone();
     } catch (e) {
-      try { doneItems = JSON.parse(localStorage.getItem('todocanva.cache.done')) || []; } catch { doneItems = []; }
+      try { doneItems = JSON.parse(localStorage.getItem('cfra.cache.done')) || []; } catch { doneItems = []; }
     }
     if (doneOverlay.classList.contains('open')) renderDoneList();
   }
@@ -549,11 +549,11 @@
     document.body.classList.toggle('still', !settings.floating);
     floatBtn.textContent = settings.floating ? 'FLOAT ON' : 'FLOAT OFF';
     floatBtn.classList.toggle('off', !settings.floating);
-    localStorage.setItem('todocanva.settings', JSON.stringify(settings));
+    localStorage.setItem('cfra.settings', JSON.stringify(settings));
   }
   async function loadSettings() {
     try { settings = await request('/api/settings', 'GET'); }
-    catch { try { settings = JSON.parse(localStorage.getItem('todocanva.settings')) || settings; } catch {} }
+    catch { try { settings = JSON.parse(localStorage.getItem('cfra.settings')) || settings; } catch {} }
     applyFloating();
   }
   floatBtn.addEventListener('click', async () => {
@@ -571,7 +571,7 @@
   function applyPage(n) {
     page = n;
     titleEl.innerHTML = `<b>${n}</b>${PAGE_NAMES[n]}`;
-    document.title = `TodoCanva · ${PAGE_NAMES[n]}`;
+    document.title = `Calendar for Real ADHD · ${PAGE_NAMES[n]}`;
     pagesEl.querySelectorAll('button').forEach(b => b.classList.toggle('active', Number(b.dataset.page) === n));
   }
   function switchPage(n) {

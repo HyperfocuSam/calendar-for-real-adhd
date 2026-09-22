@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Tiny CLI for Calendar for Real ADHD. Talks to the local server on port 8790.
+#   todo add <page> <YYYY-MM-DD> <text…>
+#   todo list [page]
+#   todo edit <page> <id> [--text "…"] [--date YYYY-MM-DD]
+#   todo done <page> <id>
+#   todo delete <page> <id>
+#   todo archive
+#   todo health
+set -euo pipefail
+B="${TODO_URL:-http://localhost:8790}"
+j() { curl -sf -H 'Content-Type: application/json' "$@"; }
+need() { command -v "$1" >/dev/null || { echo "needs $1" >&2; exit 1; }; }
+need curl; need node
+pretty() { node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const v=JSON.parse(s);const rows=Array.isArray(v)?v:[v];for(const e of rows)console.log(`${e.id}\t${e.date}\t${e.page?"p"+e.page+"\t":""}${e.text}`)})'; }
+cmd="${1:-help}"; shift || true
+case "$cmd" in
+  add)    p="$1"; d="$2"; shift 2; t="$*"
+          j -X POST "$B/api/entries?page=$p" -d "$(node -e 'console.log(JSON.stringify({text:process.argv[1],date:process.argv[2]}))' "$t" "$d")" | pretty ;;
+  list)   j "$B/api/entries?page=${1:-1}" | pretty ;;
+  edit)   p="$1"; id="$2"; shift 2; text=""; date=""
+          while [ $# -gt 0 ]; do case "$1" in --text) text="$2"; shift 2;; --date) date="$2"; shift 2;; *) shift;; esac; done
+          j -X PUT "$B/api/entries/$id?page=$p" -d "$(node -e 'const o={};if(process.argv[1])o.text=process.argv[1];if(process.argv[2])o.date=process.argv[2];console.log(JSON.stringify(o))' "$text" "$date")" | pretty ;;
+  done)   j -X POST "$B/api/entries/$2/done?page=$1" -d '{}' | pretty ;;
+  delete) j -X DELETE "$B/api/entries/$2?page=$1" ;;
+  archive) j "$B/api/done" | pretty ;;
+  health) j "$B/api/health"; echo ;;
+  *) sed -n '2,10p' "$0" ;;
+esac

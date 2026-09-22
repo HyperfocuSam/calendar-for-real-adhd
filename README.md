@@ -1,10 +1,53 @@
-# SAM-TodoCanva
+# Calendar for Real ADHD
 
-A deliberately empty page with one **LOG** button in the middle. Everything you log
-becomes a card that floats above the button, coloured by how soon its day is.
-Three separate canvases, a tiny Node backend, and nothing else.
+A calendar for people who cannot look at a calendar.
+
+One white page. One **LOG** button in the middle. Every thing you log becomes a
+card that drifts gently above the button, coloured by how close its day is.
+Red means soon. Black means later. Grey means not yet. That is the whole system.
 
 ![Layout](docs/layout.png)
+
+## Why this exists
+
+I have ADHD. Lists make me freeze. Calendars are walls of things I am already
+behind on. Every todo app I tried wanted me to decide a project, a priority, a
+tag, a time, before it would let me write the thing down. So I did not write
+the thing down.
+
+This is the opposite. You type what it is and which day. Nothing else is asked.
+The page stays mostly empty on purpose, and the cards float so it never reads
+as a stack. When something is done you cross it out and it leaves.
+
+The second half of the idea: **an agent feeds it.** My assistant reads my real
+calendar, my payment schedule, and my task tool, and posts the handful of dates
+that actually matter. I never enter them. I just see them drift past.
+
+## Run it
+
+```bash
+git clone https://github.com/HyperfocuSam/calendar-for-real-adhd
+cd calendar-for-real-adhd
+node server.js            # http://localhost:8790
+```
+
+Node 18+, zero dependencies, no build step. On macOS, double-click
+`start.command`, or `install-autostart.command` once to keep it running at
+login. Your data is plain JSON in `data/`, on your machine only.
+
+## Let an agent feed it
+
+Read [AGENTS.md](AGENTS.md). It is short and it is the point of the project.
+Any coding agent (Claude Code, Codex, Cursor, a cron job) can add, edit and
+list cards through a local HTTP API, or the bundled `todo` CLI:
+
+```bash
+./todo add 3 2026-12-06 "Stripe CLI key expires — re-pair"
+./todo list 1
+```
+
+The rule I give my agent: one card per real thing, under 80 characters, never
+touch positions, never mark anything done unless I said so.
 
 ## How it works
 
@@ -75,23 +118,6 @@ cards. The choice is stored in `data/settings.json` and applies to every page.
 - The page keeps a read-only cache in the browser and shows a banner if the
   server is down, so you can still see your cards.
 
-## Run
-
-```bash
-node server.js            # http://localhost:8790
-```
-
-On macOS:
-
-- **`start.command`** — double-click to start the server and open the page.
-- **`install-autostart.command`** — double-click once to register a Launch Agent
-  that starts the server at login and restarts it if it crashes. Remove with
-  `launchctl bootout gui/$(id -u)/com.sam.todocanva`.
-
-Open **`index.html` from disk** (`file://…`). The page talks to the API on
-port 8790; that HTTP origin is not the app (another local project may already
-own it in the browser). Set `PORT` to change the port.
-
 ## Data
 
 `data/` is git-ignored: it holds personal entries and belongs to the machine
@@ -143,6 +169,8 @@ GET    /api/health           counts per page + done count + settings
 ## Files
 
 ```
+AGENTS.md                   how an agent should feed the canvas
+todo                        tiny CLI over the API
 index.html                  the whole frontend (no build step)
 server.js                   backend + static server
 data.example/               dummy data, seeded into data/ on first run

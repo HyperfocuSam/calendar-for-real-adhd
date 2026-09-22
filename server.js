@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// TodoCanva backend — zero dependencies, Node 18+.
+// Calendar for Real ADHD backend — zero dependencies, Node 18+.
 // Serves index.html and a small JSON API. Data lives in data/entries.json.
 
 const http = require('http');
@@ -341,6 +341,6 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, '127.0.0.1', () => {
-  console.log(`TodoCanva running at http://localhost:${PORT}`);
+  console.log(`Calendar for Real ADHD running at http://localhost:${PORT}`);
   console.log(`Data dir: ${DATA_DIR}`);
 });
