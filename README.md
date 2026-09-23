@@ -88,6 +88,7 @@ Three independent canvases, switched with the **1 2 3** buttons top-right or the
 | Page | Name | Data file |
 |---|---|---|
 | 1 | Event | `data/entries.json` |
+| 0 | To-dos | `data/entries-0.json` — plain items; the card shows the day it was added; × deletes |
 | 2 | Reminders | `data/entries-2.json` |
 | 3 | Agent | `data/entries-3.json` — where an AI agent drops cards; you move them on with the card's dropdown |
 
@@ -131,6 +132,7 @@ the page, or `rm -rf data/` and restart for a blank canvas.
 ```
 data/
 ├── entries.json        page 1 · Event
+├── entries-0.json      page 0 · To-dos
 ├── entries-2.json      page 2 · Reminders
 ├── entries-3.json      page 3 · Agent (inbox from the agent)
 ├── done.json           shared CLOCK archive (all pages)

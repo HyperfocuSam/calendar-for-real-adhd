@@ -19,7 +19,7 @@ const OUT = process.argv[2] || '/Users/sam/REAL/SAM-TodoCanva/index.html';
 const rd = f => { try { return JSON.parse(fs.readFileSync(path.join(DATA, f), 'utf8')); } catch { return null; } };
 const seed = {
   builtAt: new Date().toISOString(),
-  pages: { 1: rd('entries.json') || [], 2: rd('entries-2.json') || [], 3: rd('entries-3.json') || [] },
+  pages: { 0: rd('entries-0.json') || [], 1: rd('entries.json') || [], 2: rd('entries-2.json') || [], 3: rd('entries-3.json') || [] },
   done: rd('done.json') || [],
   settings: rd('settings.json') || { floating: true },
 };
@@ -30,10 +30,10 @@ const shim = `
 (function () {
   const SEED = __SEED__;
   const KEY = 'cfra.standalone.v2';
-  const PAGES = [1, 2, 3];
+  const PAGES = [0, 1, 2, 3];
   let S = null;
   try { S = JSON.parse(localStorage.getItem(KEY)); } catch {}
-  if (!S || !S.pages) S = { pages: { 1: [], 2: [], 3: [] }, done: [], settings: SEED.settings || { floating: true }, tomb: [] };
+  if (!S || !S.pages) S = { pages: { 0: [], 1: [], 2: [], 3: [] }, done: [], settings: SEED.settings || { floating: true }, tomb: [] };
   S.tomb = S.tomb || [];
   const save = () => localStorage.setItem(KEY, JSON.stringify(S));
 
@@ -70,7 +70,7 @@ const shim = `
   function route(method, U, body) {
     const p = U.pathname;
     const page = Number(U.searchParams.get('page') || 1);
-    if (p === '/api/health') return json(200, { ok: true, dir: 'localStorage', counts: { 1: S.pages[1].length, 2: S.pages[2].length, 3: S.pages[3].length }, done: S.done.length, settings: S.settings, standalone: true, seededAt: S.seededAt });
+    if (p === '/api/health') return json(200, { ok: true, dir: 'localStorage', counts: { 0: S.pages[0].length, 1: S.pages[1].length, 2: S.pages[2].length, 3: S.pages[3].length }, done: S.done.length, settings: S.settings, standalone: true, seededAt: S.seededAt });
     if (p === '/api/settings') {
       if (method === 'GET') return json(200, S.settings);
       if (method === 'PUT') { if (typeof body.floating === 'boolean') S.settings.floating = body.floating; save(); return json(200, S.settings); }
@@ -97,7 +97,7 @@ const shim = `
     }
     if ((m = p.match(/^\\/api\\/entries\\/([^/]+)\\/done$/))) {
       if (method !== 'POST') return json(405, { error: 'method not allowed' });
-      if (!PAGES.includes(page)) return json(400, { error: 'page must be 1, 2 or 3' });
+      if (!PAGES.includes(page)) return json(400, { error: 'page must be 0, 1, 2 or 3' });
       const list = S.pages[page]; const f = list.find(e => e.id === m[1]); if (!f) return json(404, { error: 'not found' });
       const d = { id: f.id, text: f.text, date: f.date, page, createdAt: f.createdAt, doneAt: now() };
       if (f.updatedAt) d.updatedAt = f.updatedAt;
@@ -108,7 +108,7 @@ const shim = `
     }
     if ((m = p.match(/^\\/api\\/entries(?:\\/([^/]+))?$/))) {
       const id = m[1];
-      if (!PAGES.includes(page)) return json(400, { error: 'page must be 1, 2 or 3' });
+      if (!PAGES.includes(page)) return json(400, { error: 'page must be 0, 1, 2 or 3' });
       const list = S.pages[page];
       if (method === 'GET' && !id) return json(200, list);
       if (method === 'POST' && !id) {
@@ -182,4 +182,4 @@ html = html.replace('<title>', '<!-- standalone build ' + seed.builtAt + ' — g
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
 fs.writeFileSync(OUT, html);
 const n = p => seed.pages[p].length;
-console.log(`wrote ${OUT}  (cards: ${n(1)} / ${n(2)} / ${n(3)}, done ${seed.done.length}, built ${seed.builtAt})`);
+console.log(`wrote ${OUT}  (cards: ${n(0)} / ${n(1)} / ${n(2)} / ${n(3)}, done ${seed.done.length}, built ${seed.builtAt})`);

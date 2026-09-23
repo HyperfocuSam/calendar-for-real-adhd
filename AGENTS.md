@@ -7,8 +7,9 @@ No auth, no cloud, no build step. If the server is not running, start it with
 
 ## The model
 
-- Three pages: `1` Event, `2` Reminders (deadlines and payments live here too), `3` Agent.
-  A card belongs to one page. **Agents write to page 3 only.** The human moves a card to
+- Four pages: `0` To-dos (plain items, no date to pick — the card shows the day it was added),
+  `1` Event, `2` Reminders (deadlines and payments live here too), `3` Agent.
+  A card belongs to one page. **Agents write to page 3 only**, and to page 0 only when the human dictates a to-do. The human moves a card to
   Event or Reminders with the dropdown on the card; that decision is theirs.
 - A card is `{ text, date }`. `date` is `YYYY-MM-DD`, local. Nothing else is required.
 - Cards colour themselves by how close `date` is. You never set colour or position.

@@ -60,6 +60,9 @@
   .entry.today .date { opacity: 0.9; }
   .entry.later { color: #000; }
   .entry.far   { color: #555; }
+  .entry.todo  { color: #000; }
+  .entry.todo .date { opacity: .55; }
+  .entry.todo .text { max-height: none; }   /* a to-do is read whole, never clipped */
   .entry .del {
     position: absolute; top: 2px; right: 6px;
     opacity: 0; cursor: pointer; font-size: 13px; font-weight: 400; color: #999;
@@ -257,6 +260,7 @@
 <div id="canvas"></div>
 <div id="title"><b>1</b>Event</div>
 <div id="pages">
+  <button data-page="0">0</button>
   <button data-page="1" class="active">1</button>
   <button data-page="2">2</button>
   <button data-page="3">3</button>
@@ -303,7 +307,8 @@
 (() => {
   // When opened as a file:// page there is no origin, so talk to the local server directly.
   const BASE = location.protocol === 'file:' ? 'http://localhost:8790' : '';
-  const PAGE_NAMES = { 1: 'Event', 2: 'Reminders', 3: 'Agent' };
+  const PAGE_NAMES = { 0: 'To-dos', 1: 'Event', 2: 'Reminders', 3: 'Agent' };
+  const TODO_PAGE = 0;       // plain to-dos: text + the day it was added; float, delete, nothing else
   const AGENT_PAGE = 3;      // where an agent drops cards; the human moves them on with the dropdown
 
   const canvas   = document.getElementById('canvas');
@@ -589,8 +594,10 @@
 
   // ---------- pages ----------
   function pageFromHash() {
-    const n = Number((location.hash || '').replace('#', ''));
-    return PAGE_NAMES[n] ? n : 1;
+    const h = (location.hash || '').replace('#', '');
+    if (h === '') return 1;
+    const n = Number(h);
+    return PAGE_NAMES[n] !== undefined ? n : 1;
   }
   function applyPage(n) {
     page = n;
@@ -612,7 +619,7 @@
   window.addEventListener('hashchange', () => { applyPage(pageFromHash()); loadEntries(); });
   document.addEventListener('keydown', e => {
     if (overlay.classList.contains('open') || doneOverlay.classList.contains('open')) return;
-    if (['1','2','3'].includes(e.key) && !e.metaKey && !e.ctrlKey && !e.altKey) switchPage(Number(e.key));
+    if (['0','1','2','3'].includes(e.key) && !e.metaKey && !e.ctrlKey && !e.altKey) switchPage(Number(e.key));
   });
 
   // ---------- dialog ----------
@@ -628,6 +635,7 @@
     dialogSubmit.textContent = en ? 'Save' : 'Add';
     textIn.value = en ? en.text : '';
     dateIn.value = en ? en.date : localISO(todayMidnight());
+    dateIn.closest('div').hidden = (page === TODO_PAGE);   // to-dos carry the day they were added, nothing to pick
     overlay.classList.add('open');
     textIn.focus();
     if (en) textIn.select();
@@ -660,7 +668,7 @@
   dialog.addEventListener('submit', e => {
     e.preventDefault();
     const text = textIn.value.trim();
-    const date = dateIn.value;
+    const date = page === TODO_PAGE ? (editing ? editing.date : localISO(todayMidnight())) : dateIn.value;
     if (!text || !date) return;
     const en = editing;
     close();
@@ -790,7 +798,7 @@
 
   function makeEl(en) {
     const el = document.createElement('div');
-    el.className = 'entry ' + frame(en.date);
+    el.className = page === TODO_PAGE ? 'entry todo' : 'entry ' + frame(en.date);
     const rnd = (a, b) => (a + Math.random()*(b-a)).toFixed(1);
     el.style.setProperty('--dx0', rnd(-FLOAT_AMP, FLOAT_AMP) + 'px');
     el.style.setProperty('--dy0', rnd(-FLOAT_AMP, FLOAT_AMP) + 'px');
@@ -807,13 +815,17 @@
     const n = daysFromToday(en.date);
     const rel = n === 0 ? 'today' : n === 1 ? 'tomorrow' : n < 0 ? `${-n}d overdue` : `in ${n}d`;
     const wd = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(...en.date.split('-').map((v,i)=>i===1?Number(v)-1:Number(v))).getDay()];
-    date.textContent = `${wd} ${en.date} · ${rel}`;
+    date.textContent = page === TODO_PAGE ? `added ${wd} ${en.date}` : `${wd} ${en.date} · ${rel}`;
     const del = document.createElement('span');
     del.className = 'del';
     del.textContent = '×';
-    del.title = 'Remove';
+    del.title = page === TODO_PAGE ? 'Delete' : 'Remove';
     del.addEventListener('pointerdown', e => e.stopPropagation());
-    del.addEventListener('click', e => { e.stopPropagation(); markDone(en); });
+    del.addEventListener('click', e => {
+      e.stopPropagation();
+      if (page === TODO_PAGE) { if (confirm('Delete this to-do?')) deleteEntry(en); }
+      else markDone(en);
+    });
     el.append(text, date, del);
     if (page === AGENT_PAGE) {
       const mv = document.createElement('select');

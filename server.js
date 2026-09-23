@@ -12,7 +12,7 @@ const DATA_DIR = path.join(ROOT, 'data');
 const BACKUP_DIR = path.join(DATA_DIR, 'backups');
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 const DONE_FILE = path.join(DATA_DIR, 'done.json');
-const PAGES = [1, 2, 3];
+const PAGES = [0, 1, 2, 3];   // 0 = To-dos (no dates, just text + when added)
 // Page 1 keeps the original file name so existing data carries over.
 const dataFile = page => path.join(DATA_DIR, page === 1 ? 'entries.json' : `entries-${page}.json`);
 
@@ -211,7 +211,7 @@ const server = http.createServer(async (req, res) => {
       if (req.method !== 'POST') return send(res, 405, { error: 'method not allowed' });
       const id = markM[1];
       const page = Number(url.searchParams.get('page') || 1);
-      if (!PAGES.includes(page)) return send(res, 400, { error: 'page must be 1, 2 or 3' });
+      if (!PAGES.includes(page)) return send(res, 400, { error: 'page must be 0, 1, 2 or 3' });
       const body = await readBody(req);
       let entries = readEntries(page);
       const found = entries.find(e => e.id === id);
@@ -242,7 +242,7 @@ const server = http.createServer(async (req, res) => {
     if (m) {
       const id = m[1];
       const page = Number(url.searchParams.get('page') || 1);
-      if (!PAGES.includes(page)) return send(res, 400, { error: 'page must be 1, 2 or 3' });
+      if (!PAGES.includes(page)) return send(res, 400, { error: 'page must be 0, 1, 2 or 3' });
       let entries = readEntries(page);
 
       if (req.method === 'GET' && !id) return send(res, 200, entries);
