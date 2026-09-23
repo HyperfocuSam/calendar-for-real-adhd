@@ -89,7 +89,7 @@ Three independent canvases, switched with the **1 2 3** buttons top-right or the
 |---|---|---|
 | 1 | Event | `data/entries.json` |
 | 2 | Reminders | `data/entries-2.json` |
-| 3 | Deadlines | `data/entries-3.json` |
+| 3 | Agent | `data/entries-3.json` — where an AI agent drops cards; you move them on with the card's dropdown |
 
 ### Positions and motion
 
@@ -132,7 +132,7 @@ the page, or `rm -rf data/` and restart for a blank canvas.
 data/
 ├── entries.json        page 1 · Event
 ├── entries-2.json      page 2 · Reminders
-├── entries-3.json      page 3 · Deadlines
+├── entries-3.json      page 3 · Agent (inbox from the agent)
 ├── done.json           shared CLOCK archive (all pages)
 ├── settings.json       { "floating": true }
 ├── backups/            pageN-YYYY-MM-DD.json and done-YYYY-MM-DD.json, 30 days

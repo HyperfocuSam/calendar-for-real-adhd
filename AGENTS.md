@@ -7,14 +7,16 @@ No auth, no cloud, no build step. If the server is not running, start it with
 
 ## The model
 
-- Three pages: `1` Event, `2` Reminders, `3` Deadlines. A card belongs to one page.
+- Three pages: `1` Event, `2` Reminders (deadlines and payments live here too), `3` Agent.
+  A card belongs to one page. **Agents write to page 3 only.** The human moves a card to
+  Event or Reminders with the dropdown on the card; that decision is theirs.
 - A card is `{ text, date }`. `date` is `YYYY-MM-DD`, local. Nothing else is required.
 - Cards colour themselves by how close `date` is. You never set colour or position.
 - Crossing out a card moves it to a shared archive (`done.json`). It is not deleted.
 
 ## What an agent should do
 
-1. **Add, never duplicate.** `GET /api/entries?page=N` first. If a card with the
+1. **Add to page 3, never duplicate.** `GET /api/entries` on all three pages first. If a card with the
    same meaning already exists, `PUT /api/entries/:id` it instead of posting again.
 2. **One card per real thing.** A calendar event, a payment, a deadline. Not the
    recurring noise (daily blocks, standing meetings, bank debits). The canvas is
@@ -44,7 +46,7 @@ GET    /api/health                  counts per page + done count
 ## Examples
 
 ```bash
-# add a deadline
+# add a card to the agent page
 curl -s -X POST 'http://localhost:8790/api/entries?page=3' \
   -H 'Content-Type: application/json' \
   -d '{"text":"Stripe CLI key expires — re-pair","date":"2026-12-06"}'

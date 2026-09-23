@@ -65,6 +65,13 @@
     opacity: 0; cursor: pointer; font-size: 13px; font-weight: 400; color: #999;
   }
   .entry:hover .del { opacity: 1; }
+  .entry .move {
+    display: block; margin-top: 6px; font: inherit; font-size: 11px; letter-spacing: .04em;
+    color: inherit; background: transparent; border: 1px solid currentColor; border-radius: 6px;
+    padding: 2px 4px; opacity: 0.55; cursor: pointer; max-width: 100%;
+  }
+  .entry:hover .move, .entry .move:focus { opacity: 1; }
+  .entry.today .move { color: #fff; }
 
   @keyframes float {
     from { transform: translate(var(--dx0), var(--dy0)); }
@@ -296,7 +303,8 @@
 (() => {
   // When opened as a file:// page there is no origin, so talk to the local server directly.
   const BASE = location.protocol === 'file:' ? 'http://localhost:8790' : '';
-  const PAGE_NAMES = { 1: 'Event', 2: 'Reminders', 3: 'Deadlines' };
+  const PAGE_NAMES = { 1: 'Event', 2: 'Reminders', 3: 'Agent' };
+  const AGENT_PAGE = 3;      // where an agent drops cards; the human moves them on with the dropdown
 
   const canvas   = document.getElementById('canvas');
   const logBtn   = document.getElementById('log');
@@ -415,6 +423,22 @@
       cache(); render();
     } catch (e) {
       alert('Could not delete: ' + e.message);
+    }
+  }
+
+  // Move a card to another page: add it there first, then remove it here, so a
+  // failure half-way can only ever leave a duplicate, never a loss.
+  async function moveEntry(en, to) {
+    if (to === page || !PAGE_NAMES[to]) return;
+    try {
+      await request(`/api/entries?page=${to}`, 'POST', { text: en.text, date: en.date });
+      await request(`/api/entries/${encodeURIComponent(en.id)}?page=${page}`, 'DELETE');
+      entries = entries.filter(x => x.id !== en.id);
+      moved.delete(en.id);
+      cache(); render();
+      setStatus(`Moved to ${PAGE_NAMES[to]}`); setTimeout(() => setStatus(''), 1500);
+    } catch (e) {
+      alert('Could not move: ' + e.message);
     }
   }
 
@@ -791,6 +815,16 @@
     del.addEventListener('pointerdown', e => e.stopPropagation());
     del.addEventListener('click', e => { e.stopPropagation(); markDone(en); });
     el.append(text, date, del);
+    if (page === AGENT_PAGE) {
+      const mv = document.createElement('select');
+      mv.className = 'move';
+      mv.title = 'Move this card to Events or Reminders';
+      mv.innerHTML = '<option value="">move to…</option><option value="1">→ Event</option><option value="2">→ Reminders</option>';
+      mv.addEventListener('pointerdown', e => e.stopPropagation());
+      mv.addEventListener('dblclick', e => e.stopPropagation());
+      mv.addEventListener('change', e => { e.stopPropagation(); const to = Number(mv.value); if (to) moveEntry(en, to); });
+      el.appendChild(mv);
+    }
     el.title = 'Double-click to edit';
     el.addEventListener('dblclick', e => { e.preventDefault(); openDialog(en); });
 

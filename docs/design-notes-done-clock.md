@@ -10,7 +10,7 @@ Crossing out a card (the existing **×**) means done, not gone. Done cards leave
 ## Decisions
 
 - **×** on a canvas card marks it done. It is no longer a hard delete.
-- One shared done list across pages 1–3. Each row shows the original page name (Event / Reminders / Deadlines).
+- One shared done list across pages 1–3. Each row shows the original page name (Event / Reminders / Agent).
 - Each clock-list row has **REVERT** and **×** (permanent delete). No confirm, matching the old canvas ×.
 - **CLOCK** pill sits bottom-right, to the left of FLOAT, same size as SAVE / FLOAT.
 - The list opens as a centre overlay, same pattern as the LOG dialog.
