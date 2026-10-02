@@ -415,16 +415,16 @@
     localStorage.setItem('cfra.settings', JSON.stringify(settings));
   }
   skinBtn.addEventListener('click', async () => {
-    const i = skinEls.findIndex(el => el.dataset.skin === settings.skin);
+    const i = skinEls.findIndex(el => el.dataset.skin === document.documentElement.dataset.skin);
     settings.skin = skinEls[(i + 1) % skinEls.length].dataset.skin;
     applySkin();
-    try { settings = await request('/api/settings', 'PUT', { skin: settings.skin }); applySkin(); }
+    try { settings = { ...settings, ...(await request('/api/settings', 'PUT', { skin: settings.skin })) }; applySkin(); }
     catch { /* offline: remembered locally */ }
   });
   floatBtn.addEventListener('click', async () => {
     settings.floating = !settings.floating;
     applyFloating();
-    try { settings = await request('/api/settings', 'PUT', { floating: settings.floating }); applyFloating(); }
+    try { settings = { ...settings, ...(await request('/api/settings', 'PUT', { floating: settings.floating })) }; applyFloating(); }
     catch { /* offline: remembered locally, synced when the server is back */ }
   });
 
