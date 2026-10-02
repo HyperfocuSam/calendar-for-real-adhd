@@ -1,0 +1,256 @@
+/* Classic — the original look: one white page, black outlines, red when it is close.
+   A skin is one CSS file. index.html already lays everything out; a skin only decides how it looks.
+   Optional parts (#brand, #title .room, #title .info, .entry .dnum, .entry .rank, #save kbd,
+   #pages .lbl) are hidden until a skin shows them. See skins/README.md. */
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  background: #fff;
+  color: #000;
+  overflow: hidden;
+}
+
+/* The whole page is the canvas; entries can be dragged anywhere on it. */
+#canvas { position: absolute; inset: 0; }
+
+/* Entry = rectangular card */
+.entry {
+  position: absolute;
+  width: 180px;
+  padding: 10px 12px;
+  border: 1.5px solid currentColor;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 14px;
+  line-height: 1.35;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+  animation: float var(--dur, 6s) ease-in-out infinite alternate;
+  animation-delay: var(--delay, 0s);
+}
+body.still .entry { animation: none; }
+.entry.dragging {
+  animation: none;
+  cursor: grabbing;
+  z-index: 10;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+}
+.entry .text {
+  display: block;
+  overflow-wrap: anywhere;
+  max-height: 5.4em;           /* 4 lines */
+  overflow: hidden;
+}
+.entry .date {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  opacity: 0.7;
+  margin-top: 6px;
+}
+.entry.soon  { color: #d40000; font-weight: 700; }
+.entry.overdue { color: #d40000; font-weight: 700; background: #fff0f0; border-style: dashed; }
+.entry.today { color: #d40000; font-weight: 700; background: #d40000; color: #fff; border-color: #d40000; }
+.entry.today .del { color: #fff; opacity: 0.6; }
+.entry.today .date { opacity: 0.9; }
+.entry.later { color: #000; }
+.entry.far   { color: #555; }
+.entry.todo  { color: #000; }
+.entry.todo .date { opacity: .55; }
+.entry.todo .text { max-height: none; }   /* a to-do is read whole, never clipped */
+.entry .del {
+  position: absolute; top: 2px; right: 6px;
+  opacity: 0; cursor: pointer; font-size: 13px; font-weight: 400; color: #999;
+}
+.entry:hover .del { opacity: 1; }
+.entry .move {
+  display: block; margin-top: 6px; font: inherit; font-size: 11px; letter-spacing: .04em;
+  color: inherit; background: transparent; border: 1px solid currentColor; border-radius: 6px;
+  padding: 2px 4px; opacity: 0.55; cursor: pointer; max-width: 100%;
+}
+.entry:hover .move, .entry .move:focus { opacity: 1; }
+.entry.today .move { color: #fff; }
+
+@keyframes float {
+  from { transform: translate(var(--dx0), var(--dy0)); }
+  to   { transform: translate(var(--dx1), var(--dy1)); }
+}
+
+/* Shared pill-button look */
+.pill {
+  font: 600 13px/1 inherit;
+  letter-spacing: 0.12em;
+  padding: 12px 22px;
+  border: 2px solid #000;
+  background: #fff;
+  color: #000;
+  cursor: pointer;
+  border-radius: 999px;
+  z-index: 5;
+}
+.pill:hover { background: #000; color: #fff; }
+.pill:disabled { opacity: 0.5; cursor: default; }
+
+/* LOG button, dead centre */
+#log {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 18px;
+  letter-spacing: 0.15em;
+  padding: 18px 40px;
+}
+
+/* SAVE, bottom-left */
+#save { position: fixed; left: 20px; bottom: 20px; }
+#save.dirty { background: #000; color: #fff; }
+#save.dirty::after { content: ' •'; }
+#save.saved { border-color: #1a7f37; color: #1a7f37; background: #fff; }
+
+/* CLOCK + FLOAT, bottom-right */
+#dock-right {
+  position: fixed; right: 20px; bottom: 20px;
+  display: flex; gap: 8px; z-index: 5;
+}
+#clock {
+  display: inline-flex; align-items: center; gap: 8px;
+}
+#clock svg {
+  width: 14px; height: 14px;
+  stroke: currentColor; fill: none; stroke-width: 2;
+}
+#float.off { color: #777; border-color: #777; border-style: dashed; }
+#float.off:hover { background: #777; color: #fff; }
+
+/* Page title, top-left */
+#title {
+  position: fixed; left: 20px; top: 18px;
+  font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase;
+  color: #555; user-select: none; z-index: 5;
+}
+#title b { color: #000; margin-right: 8px; }
+
+/* Page switcher, top-right */
+#pages {
+  position: fixed; right: 20px; top: 14px;
+  display: flex; gap: 4px; z-index: 5;
+  border: 1.5px solid #000; border-radius: 999px; padding: 3px;
+  background: #fff;
+}
+#pages button {
+  width: 26px; height: 26px; border-radius: 50%;
+  border: none; background: transparent; color: #000;
+  font: 600 12px/1 inherit; cursor: pointer;
+}
+#pages button:hover { background: #eee; }
+#pages button.active { background: #000; color: #fff; }
+
+/* Connection status banner */
+#status {
+  position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
+  font-size: 12px; padding: 6px 12px; border-radius: 999px;
+  background: #fff3cd; color: #7a5a00; border: 1px solid #f0d78a;
+  display: none; z-index: 5;
+}
+#status.show { display: block; }
+
+/* Prompt dialog */
+#overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.35);
+  display: none;
+  align-items: center; justify-content: center;
+  z-index: 20;
+}
+#overlay.open { display: flex; }
+#dialog {
+  background: #fff;
+  padding: 24px;
+  width: 320px;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  display: flex; flex-direction: column; gap: 12px;
+}
+#dialog label { font-size: 12px; color: #555; display: block; margin-bottom: 4px; }
+#dialog input, #dialog textarea {
+  width: 100%; font-size: 16px; padding: 10px;
+  border: 1px solid #ccc; border-radius: 8px; font-family: inherit;
+}
+#dialog textarea { resize: vertical; min-height: 64px; }
+#dialog .row { display: flex; gap: 8px; justify-content: flex-end; }
+#dialog button {
+  font-size: 14px; padding: 8px 16px; border-radius: 8px;
+  border: 1px solid #000; background: #fff; cursor: pointer;
+}
+#dialog button.primary { background: #000; color: #fff; }
+#dialog h2 { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; }
+#dialog button.danger { border-color: #d40000; color: #d40000; display: none; }
+#dialog button.danger:hover { background: #d40000; color: #fff; }
+#dialog.editing button.danger { display: inline-block; }
+
+/* Done list overlay */
+#done-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.35);
+  display: none;
+  align-items: center; justify-content: center;
+  z-index: 20;
+}
+#done-overlay.open { display: flex; }
+#done-dialog {
+  background: #fff;
+  padding: 22px 22px 16px;
+  width: 420px;
+  max-width: calc(100vw - 40px);
+  max-height: 70vh;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  display: flex; flex-direction: column; gap: 8px;
+}
+#done-dialog h2 {
+  margin: 0;
+  font-size: 12px; font-weight: 600;
+  letter-spacing: 0.16em; text-transform: uppercase;
+}
+#done-list { overflow-y: auto; }
+#done-list .empty {
+  font-size: 14px; color: #777; padding: 18px 0 10px;
+}
+.done-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 0;
+  border-top: 1px solid #eee;
+}
+.done-row .txt { flex: 1; min-width: 0; }
+.done-row .name {
+  display: block;
+  font-size: 14px;
+  text-decoration: line-through;
+  opacity: 0.75;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.done-row .meta { display: block; font-size: 11px; color: #777; margin-top: 2px; }
+.done-row .revert {
+  flex-shrink: 0;
+  font: 600 11px/1 inherit;
+  letter-spacing: 0.1em;
+  padding: 7px 12px;
+  border: 1.5px solid #000;
+  background: #fff;
+  color: #000;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.done-row .revert:hover { background: #000; color: #fff; }
+.done-row .del {
+  flex-shrink: 0;
+  cursor: pointer; font-size: 16px; font-weight: 400; color: #999;
+  padding: 4px 6px;
+}
+.done-row .del:hover { color: #000; }
+
+/* the page keys are plain digits here */
+#pages kbd { font: inherit; }

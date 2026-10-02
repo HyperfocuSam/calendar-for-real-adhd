@@ -4,427 +4,75 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Calendar for Real ADHD</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@700;800;900&display=swap">
 <style>
-  /* Skin: after the lobby/room screens of Survival Project (I.O. Entertainment, 2001) —
-     sky-and-grass backdrop, gold outlined room titles, glossy capsule buttons on blue trays,
-     element-framed cards with a rank tile. Layout, sizes and behaviour are unchanged. */
-  :root {
-    --ink: #0a2a66;            /* the dark navy outline everything sits in */
-    --tray: #1d5fd6;
-    --tray-dk: #0c3796;
-    --tray-lt: #8fd6ff;
-    --text: #1b2142;
-    --title: 'Lilita One', 'Arial Rounded MT Bold', 'Trebuchet MS', sans-serif;
-  }
+  /* Structure only: what every skin shares. How things LOOK lives in skins/*.css. */
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
-  body {
-    font-family: 'Nunito', 'Arial Rounded MT Bold', -apple-system, BlinkMacSystemFont, sans-serif;
-    font-weight: 800;
-    color: var(--text);
-    overflow: hidden;
-    background:
-      radial-gradient(60px 26px at 12% 16%, #fff 60%, transparent 62%),
-      radial-gradient(90px 34px at 16% 13%, #fff 60%, transparent 62%),
-      radial-gradient(70px 28px at 20% 17%, #fff 58%, transparent 61%),
-      radial-gradient(80px 30px at 72% 22%, rgba(255,255,255,.95) 60%, transparent 62%),
-      radial-gradient(110px 38px at 77% 19%, rgba(255,255,255,.95) 60%, transparent 62%),
-      radial-gradient(70px 26px at 82% 23%, rgba(255,255,255,.95) 58%, transparent 61%),
-      radial-gradient(50px 18px at 45% 35%, rgba(255,255,255,.75) 60%, transparent 62%),
-      radial-gradient(70px 22px at 48% 33%, rgba(255,255,255,.75) 60%, transparent 62%),
-      radial-gradient(120% 60% at 18% 112%, #4fb52a 0 58%, #3c9a1f 58.3% 60%, transparent 60.3%),
-      radial-gradient(110% 55% at 88% 115%, #6fcf38 0 58%, #4caa25 58.3% 60%, transparent 60.3%),
-      radial-gradient(160% 70% at 50% 128%, #9be05a 0 60%, transparent 60.3%),
-      linear-gradient(#2fa8f5 0%, #6cc9ff 38%, #bdeaff 70%, #e8f9ff 100%);
-  }
-
+  body { overflow: hidden; }
   #canvas { position: absolute; inset: 0; }
-
-  /* ---------- cards: element-framed, like the Card Select slots ---------- */
   .entry {
-    --c1: #e9edf2; --c2: #8d97a6;            /* frame gradient (default: stone/silver) */
-    --body1: #fffef6; --body2: #f3efe0;      /* card face */
-    position: absolute;
-    width: 180px;
-    padding: 24px 11px 9px;
-    border: 4px solid transparent;
-    border-radius: 12px;
-    background:
-      linear-gradient(var(--body1), var(--body2)) padding-box,
-      linear-gradient(160deg, var(--c1), var(--c2)) border-box;
-    box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--ink), 0 6px 0 4px rgba(10,42,102,.28);
-    font-size: 14px;
-    line-height: 1.3;
-    cursor: grab;
-    user-select: none;
-    touch-action: none;
+    position: absolute; width: 180px;
+    cursor: grab; user-select: none; touch-action: none;
     animation: float var(--dur, 6s) ease-in-out infinite alternate;
     animation-delay: var(--delay, 0s);
   }
   body.still .entry { animation: none; }
-  .entry.dragging {
-    animation: none;
-    cursor: grabbing;
-    z-index: 10;
-    box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--ink), 0 16px 26px 4px rgba(10,42,102,.35);
-  }
-  .entry .text {
-    display: block;
-    overflow-wrap: anywhere;
-    max-height: 5.2em;           /* 4 lines */
-    overflow: hidden;
-  }
-  /* the date line reads like the "Level 9" plate at the foot of a card */
-  .entry .date {
-    display: block;
-    margin-top: 6px;
-    font: italic 400 12px/1.1 var(--title);
-    letter-spacing: .02em;
-    color: var(--c2);
-    filter: brightness(.7);
-  }
-  /* top strip: countdown plate (left) and rank tile (right) */
-  .entry .dnum, .entry .rank {
-    position: absolute; top: 3px;
-    font: 400 12px/1 var(--title);
-    letter-spacing: .03em;
-    color: #fff;
-    -webkit-text-stroke: .6px var(--ink);
-    text-shadow: 0 1px 0 var(--ink);
-    padding: 3px 6px 2px;
-    border-radius: 5px;
-    background: linear-gradient(var(--c1), var(--c2));
-    box-shadow: 0 0 0 1.5px var(--ink), inset 0 1px 0 rgba(255,255,255,.6);
-  }
-  .entry .dnum { left: 4px; }
-  .entry .rank { right: 4px; min-width: 22px; text-align: center; }
-
-  .entry.soon    { --c1: #ffd23a; --c2: #f07800; }                  /* within 7 days: gold */
-  .entry.overdue { --c1: #ff7a4a; --c2: #b80f0f; --body1: #fff1ea; --body2: #ffd9cc; }
-  .entry.today   { --c1: #ff8a3a; --c2: #d4140f; --body1: #fff4dc; --body2: #ffdca0;
-                   box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--ink), 0 6px 0 4px rgba(10,42,102,.28), 0 0 22px 8px rgba(255,120,30,.55); }
-  .entry.overdue .rank, .entry.today .rank { animation: blink 1.1s steps(2, jump-none) infinite; }
-  .entry.later   { --c1: #7fd8ff; --c2: #1662d8; }                  /* 8–30 days: water blue */
-  .entry.far     { --c1: #dde2e9; --c2: #6c7789; color: #4a5168; }  /* beyond: stone */
-  .entry.todo    { --c1: #ffa6dc; --c2: #c2399a; }                  /* to-dos: the pink PET card */
-  .entry.todo .date { font-size: 11px; }
-  .entry.todo .text { max-height: none; }   /* a to-do is read whole, never clipped */
-
-  .entry .del {
-    position: absolute; top: -13px; right: -13px;
-    width: 22px; height: 22px; border-radius: 50%;
-    display: grid; place-items: center;
-    font: 900 14px/1 'Nunito', sans-serif; color: #fff;
-    background: radial-gradient(circle at 35% 30%, #ff9a8a, #e0201a 60%, #9c0c0c);
-    box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px var(--ink);
-    opacity: 0; cursor: pointer; z-index: 2;
-    transition: opacity .12s, transform .12s;
-  }
-  .entry:hover .del { opacity: 1; }
-  .entry .del:hover { transform: scale(1.12); }
-  .entry .move {
-    display: block; margin-top: 7px; max-width: 100%;
-    font: 800 11px/1 'Nunito', sans-serif; letter-spacing: .04em;
-    color: #fff; padding: 4px 8px; cursor: pointer;
-    border: 1.5px solid var(--ink); border-radius: 999px;
-    background: linear-gradient(#6fc6ff, #1c6ae0 55%, #0f4cb8);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
-    opacity: .75;
-  }
-  .entry:hover .move, .entry .move:focus { opacity: 1; }
-  .entry .move option { color: var(--text); background: #fff; }
-
+  .entry.dragging { animation: none; cursor: grabbing; z-index: 100000 !important; }
+  .entry .text, .entry .date { display: block; overflow-wrap: anywhere; }
+  .entry .del { position: absolute; cursor: pointer; }
+  .entry .move { display: block; max-width: 100%; cursor: pointer; }
   @keyframes float {
     from { transform: translate(var(--dx0), var(--dy0)); }
     to   { transform: translate(var(--dx1), var(--dy1)); }
   }
-  @keyframes blink { 50% { filter: brightness(1.45); } }
-  @keyframes glow  { 50% { box-shadow: inset 0 2px 0 rgba(255,255,255,.75), 0 4px 0 var(--ink), 0 0 0 6px rgba(255,236,120,.45); } }
-  @media (prefers-reduced-motion: reduce) {
-    .entry .rank, #log, #save.dirty { animation: none !important; }
-  }
-
-  /* ---------- glossy capsule buttons ---------- */
-  .pill {
-    --b1: #fff3a6; --b2: #ffd21c; --b3: #f2a100;   /* default: the yellow READY capsule */
-    --fg: #5a2c00;
-    font: 400 15px/1 var(--title);
-    letter-spacing: .06em;
-    padding: 10px 20px 9px;
-    border: 2.5px solid var(--ink);
-    border-radius: 999px;
-    background: linear-gradient(var(--b1) 0%, var(--b2) 48%, var(--b3) 52%, var(--b2) 100%);
-    color: var(--fg);
-    text-shadow: 0 1px 0 rgba(255,255,255,.6);
-    box-shadow: inset 0 2px 0 rgba(255,255,255,.75), 0 4px 0 var(--ink);
-    cursor: pointer;
-    z-index: 5;
-    position: relative;
-    transition: transform .08s, filter .12s;
-  }
-  .pill:hover  { filter: brightness(1.08) saturate(1.1); }
-  .pill:active { transform: translateY(3px); box-shadow: inset 0 2px 0 rgba(255,255,255,.75), 0 1px 0 var(--ink); }
-  .pill:disabled { opacity: 0.6; cursor: default; }
-  /* key hint plate above a button, like the F12 / F6 labels */
-  .pill kbd, #pages kbd {
-    position: absolute; left: 50%; top: -15px; transform: translateX(-50%);
-    font: 900 10px/1 'Nunito', sans-serif; letter-spacing: .04em;
-    color: #fff; background: var(--tray-dk);
-    padding: 2px 6px 3px; border-radius: 4px 4px 0 0;
-    box-shadow: 0 0 0 1.5px var(--ink);
-    text-shadow: none;
-  }
-
-  /* LOG, dead centre — the big READY button */
-  #log {
-    position: absolute;
-    left: 50%; top: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 26px;
-    letter-spacing: 0.12em;
-    padding: 16px 52px 14px;
-    border-width: 3px;
-    animation: glow 2.4s ease-in-out infinite;
-  }
-  #log:active { transform: translate(-50%, calc(-50% + 3px)); }
-
-  /* SAVE, bottom-left — green */
-  #save { position: fixed; left: 20px; bottom: 30px; --b1: #d9ff9e; --b2: #79d321; --b3: #3f9f0c; --fg: #fff;
-          text-shadow: 0 0 1px var(--ink), 0 1px 0 var(--ink), 0 -1px 0 var(--ink), 1px 0 0 var(--ink), -1px 0 0 var(--ink); }
-  #save.dirty { --b1: #ffe0a0; --b2: #ff9d1c; --b3: #e86400; animation: glow 1.2s ease-in-out infinite; }
-  #save.dirty::after { content: ' •'; }
-  #save.saved { --b1: #b6f7ff; --b2: #3cc8ff; --b3: #1288e0; }
-
-  /* CLOCK + FLOAT, bottom-right — orange capsules on a blue tray (the KICK / INVITE bar) */
-  #dock-right {
-    position: fixed; right: 20px; bottom: 26px;
-    display: flex; gap: 6px; z-index: 5;
-    padding: 6px 8px 8px;
-    border-radius: 999px;
-    background: linear-gradient(var(--tray-lt), var(--tray) 45%, var(--tray-dk));
-    box-shadow: 0 0 0 2.5px var(--ink), inset 0 2px 0 rgba(255,255,255,.5);
-  }
-  #dock-right .pill { --b1: #ffd9a0; --b2: #ff9a2a; --b3: #e5600a; --fg: #fff; font-size: 13px; padding: 8px 16px 7px;
-                      text-shadow: 0 0 1px #6b2400, 0 1px 0 #6b2400, 0 -1px 0 #6b2400, 1px 0 0 #6b2400, -1px 0 0 #6b2400; }
-  #clock { display: inline-flex; align-items: center; gap: 7px; }
-  #clock svg { width: 15px; height: 15px; stroke: #fff; fill: none; stroke-width: 2.6; filter: drop-shadow(0 1px 0 #6b2400); }
-  #dock-right #float.off { --b1: #ffffff; --b2: #d6dbe3; --b3: #a7b0bd; --fg: #3b4560; text-shadow: 0 1px 0 #fff; }
-
-  /* ---------- top: logo + breadcrumb (left), room title (centre) ---------- */
-  #brand {
-    position: fixed; left: 18px; top: 12px; z-index: 5; user-select: none;
-  }
-  #brand .logo {
-    display: block;
-    font: 400 22px/1 var(--title);
-    letter-spacing: .01em;
-    color: #ffd21c;
-    -webkit-text-stroke: 1.2px #6b2b00;
-    text-shadow: 0 2px 0 #6b2b00, 0 3px 6px rgba(0,0,0,.25);
-    transform: rotate(-2deg);
-    transform-origin: left center;
-  }
-  #brand .logo i { font-style: normal; color: #fff; -webkit-text-stroke: 1.2px var(--ink); text-shadow: 0 2px 0 var(--ink); }
-  #brand .crumb {
-    display: block; margin-top: 6px;
-    font: 800 12px/1 'Nunito', sans-serif; letter-spacing: .04em;
-    color: #fff; text-shadow: 0 1px 2px rgba(10,42,102,.8);
-  }
-
-  #title {
-    position: fixed; left: 50%; top: 6px; transform: translateX(-50%);
-    z-index: 5; user-select: none; text-align: center; white-space: nowrap;
-  }
-  #title .room {
-    display: block;
-    font: italic 400 40px/1.05 var(--title);
-    letter-spacing: .02em;
-    background: linear-gradient(#fffbd0 0%, #ffe23a 45%, #ffb000 55%, #ff8a00 100%);
-    -webkit-background-clip: text; background-clip: text;
-    color: transparent;
-    -webkit-text-stroke: 2px #4a1f00;
-    filter: drop-shadow(0 3px 0 #4a1f00) drop-shadow(0 4px 8px rgba(0,0,0,.25));
-  }
-  #title .room b { font-weight: 400; }
-  /* the blue strip under a room title ("3mins come | hero mode") */
-  #title .info {
-    display: inline-flex; gap: 6px; margin-top: 4px; padding: 4px 6px;
-    border-radius: 999px;
-    background: linear-gradient(var(--tray-lt), var(--tray) 45%, var(--tray-dk));
-    box-shadow: 0 0 0 2px var(--ink), inset 0 1px 0 rgba(255,255,255,.5);
-  }
-  #title .info span {
-    font: 800 11px/1 'Nunito', sans-serif; letter-spacing: .05em; color: #fff;
-    padding: 4px 10px; border-radius: 999px;
-    background: linear-gradient(#5aa8ff, #1b54c4);
-    box-shadow: 0 0 0 1.5px var(--ink), inset 0 1px 0 rgba(255,255,255,.45);
-  }
-  #title .info span.hot { background: linear-gradient(#ff8a7a, #d41e14); }
-  #title .info span:empty { display: none; }
-
-  /* ---------- page switcher: the ME / GAME / GUILD / FRIENDS tabs ---------- */
-  #pages {
-    position: fixed; right: 18px; top: 22px;
-    display: flex; gap: 3px; z-index: 5;
-    padding: 0 6px;
-    border-bottom: 3px solid var(--ink);
-  }
-  #pages button {
-    position: relative;
-    min-width: 64px; padding: 7px 10px 6px;
-    border: 2px solid var(--ink); border-bottom: none;
-    border-radius: 10px 10px 0 0;
-    background: linear-gradient(#9fdcff, #3f8ef0 50%, #1d5fd6);
-    color: #dff3ff;
-    font: 900 11px/1 'Nunito', sans-serif; letter-spacing: .06em;
-    text-shadow: 0 1px 0 var(--ink);
-    cursor: pointer;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.55);
-  }
-  #pages button:hover { filter: brightness(1.1); }
-  #pages button.active {
-    background: linear-gradient(#ffffff, #e6f6ff 50%, #bfe6ff);
-    color: var(--ink); text-shadow: none;
-    padding-top: 9px; margin-top: -2px;
-  }
-  #pages kbd { top: -14px; }
-  #pages button.active kbd { background: #f28a00; }
-
-  /* ---------- connection banner: the HELP bar at the foot of the room ---------- */
-  #status {
-    position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
-    font: 800 12px/1.2 'Nunito', sans-serif; color: #fff;
-    padding: 8px 14px; border-radius: 8px;
-    background: linear-gradient(rgba(10,42,102,.92), rgba(6,26,70,.92));
-    box-shadow: 0 0 0 2px #ffd21c;
-    display: none; z-index: 5; max-width: calc(100vw - 520px);
-  }
-  #status::before { content: 'HELP ⚠'; color: #ffd21c; margin-right: 8px; letter-spacing: .08em; }
+  .pill { cursor: pointer; z-index: 5; }
+  #log { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+  #save, #dock-right, #title, #brand, #pages, #status { position: fixed; z-index: 5; }
+  #title, #brand { user-select: none; }
+  #dock-right, #pages { display: flex; }
+  #status { display: none; }
   #status.show { display: block; }
-
-  /* ---------- dialogs: the blue chat panel ---------- */
   #overlay, #done-overlay {
-    position: fixed; inset: 0;
-    background: rgba(6,26,70,0.45);
-    display: none;
-    align-items: center; justify-content: center;
-    z-index: 20;
+    position: fixed; inset: 0; z-index: 20;
+    display: none; align-items: center; justify-content: center;
   }
   #overlay.open, #done-overlay.open { display: flex; }
-  #dialog, #done-dialog {
-    position: relative;
-    background:
-      repeating-linear-gradient(transparent 0 29px, rgba(255,255,255,.06) 29px 30px),
-      linear-gradient(#2a74ec, #1446b8 60%, #0d358f);
-    border: 3px solid var(--tray-lt);
-    border-radius: 16px;
-    box-shadow: 0 0 0 3px var(--ink), 0 24px 60px rgba(6,26,70,.5), inset 0 2px 0 rgba(255,255,255,.35);
-    color: #fff;
-  }
-  #dialog {
-    padding: 34px 22px 20px;
-    width: 340px;
-    display: flex; flex-direction: column; gap: 12px;
-  }
-  /* dialog titles sit on the frame like "~ Lobby ~" */
-  #dialog h2, #done-dialog h2 {
-    position: absolute; left: 50%; top: -22px; transform: translateX(-50%);
-    margin: 0; white-space: nowrap; padding: 0 4px;
-    font: italic 400 36px/1 var(--title);
-    letter-spacing: .02em;
-    background: linear-gradient(#fffbd0 0%, #ffe23a 45%, #ffb000 55%, #ff8a00 100%);
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-    -webkit-text-stroke: 1.6px #4a1f00;
-    filter: drop-shadow(0 3px 0 #4a1f00);
-  }
-  #dialog label { font: 900 11px/1 'Nunito', sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--tray-lt); display: block; margin-bottom: 6px; }
-  #dialog input, #dialog textarea {
-    width: 100%; font: 800 16px/1.3 'Nunito', sans-serif; padding: 10px 12px; color: var(--text);
-    border: 2px solid var(--ink); border-radius: 10px;
-    background: linear-gradient(#ffffff, #eaf6ff);
-    box-shadow: inset 0 2px 4px rgba(10,42,102,.25);
-  }
-  #dialog input:focus, #dialog textarea:focus { outline: none; box-shadow: inset 0 2px 4px rgba(10,42,102,.25), 0 0 0 3px #ffd21c; }
-  #dialog textarea { resize: vertical; min-height: 64px; }
-  #dialog .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
-  #dialog button {
-    --b1: #ffffff; --b2: #d6dbe3; --b3: #a7b0bd;
-    font: 400 15px/1 var(--title); letter-spacing: .05em;
-    padding: 9px 18px 8px; border-radius: 999px; cursor: pointer;
-    border: 2.5px solid var(--ink); color: #3b4560;
-    background: linear-gradient(var(--b1) 0%, var(--b2) 48%, var(--b3) 52%, var(--b2) 100%);
-    box-shadow: inset 0 2px 0 rgba(255,255,255,.75), 0 3px 0 var(--ink);
-  }
-  #dialog button:active { transform: translateY(2px); box-shadow: inset 0 2px 0 rgba(255,255,255,.75), 0 1px 0 var(--ink); }
-  #dialog button.primary { --b1: #d9ff9e; --b2: #79d321; --b3: #3f9f0c; color: #fff;
-    text-shadow: 0 0 1px var(--ink), 0 1px 0 var(--ink), 0 -1px 0 var(--ink), 1px 0 0 var(--ink), -1px 0 0 var(--ink); }
-  #dialog button.danger { --b1: #ffb3a6; --b2: #f0442e; --b3: #b8140c; color: #fff; display: none;
-    text-shadow: 0 0 1px #5a0000, 0 1px 0 #5a0000, 0 -1px 0 #5a0000, 1px 0 0 #5a0000, -1px 0 0 #5a0000; }
-  #dialog button.danger:hover { filter: brightness(1.1); }
+  #dialog, #done-dialog { display: flex; flex-direction: column; }
+  #dialog button.danger { display: none; }
   #dialog.editing button.danger { display: inline-block; }
-
-  /* ---------- done list: chat rows ---------- */
-  #done-dialog {
-    padding: 34px 16px 12px;
-    width: 440px;
-    max-width: calc(100vw - 40px);
-    max-height: 70vh;
-    display: flex; flex-direction: column; gap: 8px;
-  }
-  #done-list { overflow-y: auto; border-radius: 10px; background: rgba(4,22,66,.35); box-shadow: inset 0 0 0 2px rgba(143,214,255,.35); }
-  #done-list .empty { font-size: 14px; color: var(--tray-lt); padding: 18px 14px 14px; }
-  .done-row {
-    display: flex; align-items: center; gap: 8px;
-    padding: 8px 10px;
-    border-top: 1px solid rgba(143,214,255,.22);
-  }
-  .done-row:first-child { border-top: none; }
-  .done-row:nth-child(even) { background: rgba(255,255,255,.05); }
+  #done-list { overflow-y: auto; }
+  .done-row { display: flex; align-items: center; }
   .done-row .txt { flex: 1; min-width: 0; }
-  .done-row .name {
-    display: block;
-    font-size: 14px;
-    text-decoration: line-through;
-    text-decoration-color: rgba(255,210,28,.8);
-    opacity: 0.9;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-  .done-row .meta { display: block; font-size: 11px; color: var(--tray-lt); margin-top: 3px; }
-  .done-row .meta::before {
-    content: 'Tip'; font: 900 9px/1 'Nunito', sans-serif; letter-spacing: .06em;
-    color: #fff; background: #3f6fbf; padding: 2px 5px; border-radius: 3px; margin-right: 6px;
-  }
-  .done-row .revert {
-    flex-shrink: 0;
-    font: 400 12px/1 var(--title); letter-spacing: .06em;
-    padding: 7px 12px 6px;
-    border: 2px solid var(--ink); border-radius: 999px;
-    background: linear-gradient(#fff3a6 0%, #ffd21c 48%, #f2a100 52%, #ffd21c 100%);
-    color: #5a2c00;
-    box-shadow: inset 0 2px 0 rgba(255,255,255,.75), 0 2px 0 var(--ink);
-    cursor: pointer;
-  }
-  .done-row .revert:hover { filter: brightness(1.08); }
-  .done-row .del {
-    flex-shrink: 0;
-    cursor: pointer; font-size: 18px; font-weight: 900; color: #ff8a7a;
-    padding: 4px 6px;
-  }
-  .done-row .del:hover { color: #fff; }
+  .done-row .name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: line-through; }
+  .done-row .revert, .done-row .del { flex-shrink: 0; cursor: pointer; }
+  /* optional parts: hidden until a skin shows them */
+  #brand, #title .room, #title .info, .entry .dnum, .entry .rank, #save kbd, #pages .lbl { display: none; }
 </style>
+<!-- Skins: one CSS file each in skins/. The first one is the default. Add yours as one more line. -->
+<link rel="stylesheet" href="skins/classic.css" data-skin="classic" data-label="Classic">
+<link rel="stylesheet" href="skins/arcade.css" data-skin="arcade" data-label="Arcade">
+<script>
+  // Switch the remembered skin on before first paint, so the page never flashes the other one.
+  (function () {
+    let want = null;
+    try { want = (JSON.parse(localStorage.getItem('cfra.settings')) || {}).skin; } catch {}
+    const all = [...document.querySelectorAll('link[data-skin], style[data-skin]')];
+    if (!all.some(el => el.dataset.skin === want)) want = all[0] && all[0].dataset.skin;
+    all.forEach(el => { el.disabled = el.dataset.skin !== want; });
+    document.documentElement.dataset.skin = want;
+  })();
+</script>
 </head>
 <body>
 
 <div id="canvas"></div>
 <div id="brand"><span class="logo">Calendar <i>for Real</i> ADHD</span><span class="crumb">&rarr; page 1 &middot; Event</span></div>
-<div id="title"><span class="room">~ EvenT ~</span><span class="info"><span></span><span class="hot"></span></span></div>
+<div id="title"><span class="plain"><b>1</b>Event</span><span class="room">~ EvenT ~</span><span class="info"><span></span><span class="hot"></span></span></div>
 <div id="pages">
-  <button data-page="0"><kbd>0</kbd>TO-DO</button>
-  <button data-page="1" class="active"><kbd>1</kbd>EVENT</button>
-  <button data-page="2"><kbd>2</kbd>REMIND</button>
-  <button data-page="3"><kbd>3</kbd>AGENT</button>
+  <button data-page="0"><kbd>0</kbd><span class="lbl">TO-DO</span></button>
+  <button data-page="1" class="active"><kbd>1</kbd><span class="lbl">EVENT</span></button>
+  <button data-page="2"><kbd>2</kbd><span class="lbl">REMIND</span></button>
+  <button data-page="3"><kbd>3</kbd><span class="lbl">AGENT</span></button>
 </div>
 <button id="log" class="pill">LOG</button>
 <button id="save" class="pill"><kbd>&#8984;S</kbd><span class="lbl">SAVE</span></button>
@@ -434,6 +82,7 @@
     CLOCK
   </button>
   <button id="float" class="pill" title="Toggle the gentle floating motion">FLOAT ON</button>
+  <button id="skin" class="pill" title="Change the look (skins/)">SKIN</button>
 </div>
 <div id="status"></div>
 
@@ -478,6 +127,7 @@
   const saveLbl  = saveBtn.querySelector('.lbl');
   const clockBtn = document.getElementById('clock');
   const floatBtn = document.getElementById('float');
+  const skinBtn  = document.getElementById('skin');
   const titleEl  = document.getElementById('title');
   const brandEl  = document.getElementById('brand');
   const pagesEl  = document.getElementById('pages');
@@ -747,7 +397,30 @@
     try { settings = await request('/api/settings', 'GET'); }
     catch { try { settings = JSON.parse(localStorage.getItem('cfra.settings')) || settings; } catch {} }
     applyFloating();
+    applySkin();
   }
+
+  // ---------- skins: every <link data-skin> in <head> is one (inlined as <style data-skin> in the standalone build); SKIN cycles through them ----------
+  const skinEls = [...document.querySelectorAll('link[data-skin], style[data-skin]')];
+  function applySkin() {
+    if (!skinEls.some(el => el.dataset.skin === settings.skin)) settings.skin = skinEls[0] && skinEls[0].dataset.skin;
+    const cur = skinEls.find(el => el.dataset.skin === settings.skin);
+    if (document.documentElement.dataset.skin !== settings.skin) {
+      skinEls.forEach(el => { el.disabled = el !== cur; });
+      document.documentElement.dataset.skin = settings.skin;
+      requestAnimationFrame(() => render());   // a skin changes sizes; lay the cards out around the new ones
+    }
+    skinBtn.textContent = 'SKIN · ' + ((cur && cur.dataset.label) || settings.skin || '').toUpperCase();
+    skinBtn.hidden = skinEls.length < 2;
+    localStorage.setItem('cfra.settings', JSON.stringify(settings));
+  }
+  skinBtn.addEventListener('click', async () => {
+    const i = skinEls.findIndex(el => el.dataset.skin === settings.skin);
+    settings.skin = skinEls[(i + 1) % skinEls.length].dataset.skin;
+    applySkin();
+    try { settings = await request('/api/settings', 'PUT', { skin: settings.skin }); applySkin(); }
+    catch { /* offline: remembered locally */ }
+  });
   floatBtn.addEventListener('click', async () => {
     settings.floating = !settings.floating;
     applyFloating();
@@ -766,6 +439,7 @@
     page = n;
     // room-title casing from the game ("~ LobbY ~", "~ 11th RooM ~"): last letter of each word up
     const room = PAGE_NAMES[n].split(' ').map(w => w.slice(0, -1) + w.slice(-1).toUpperCase()).join(' ');
+    titleEl.querySelector('.plain').innerHTML = `<b>${n}</b>${PAGE_NAMES[n]}`;
     titleEl.querySelector('.room').textContent = `~ ${room} ~`;
     brandEl.querySelector('.crumb').textContent = `→ page ${n} · ${PAGE_NAMES[n]}`;
     document.title = `Calendar for Real ADHD · ${PAGE_NAMES[n]}`;
@@ -856,7 +530,7 @@
   }
   function obstacles() {
     // Fixed UI the cards must never sit on top of.
-    return [logBtn, saveBtn, clockBtn, floatBtn, titleEl, brandEl, pagesEl, status]
+    return [logBtn, saveBtn, clockBtn, floatBtn, skinBtn, titleEl, brandEl, pagesEl, status]
       .filter(el => el.getClientRects().length > 0)   // fixed elements have no offsetParent; this skips only hidden ones
       .map(el => {
         const r = el.getBoundingClientRect();
@@ -921,14 +595,15 @@
     const els = new Map();
     entries.forEach(en => { const el = makeEl(en); canvas.appendChild(el); els.set(en.id, el); });
 
-    // 1. Cards with a remembered position go exactly there. They are only nudged if the
-    //    window is now too small or something overlaps, and that nudge is NOT saved, so
-    //    the remembered position survives.
+    // 1. Cards with a remembered position go exactly there, even on top of another card:
+    //    stacking is the human's call. They are only nudged if the window is now too small
+    //    or they sit on a button, and that nudge is NOT saved, so the remembered position survives.
+    const ui = taken.slice();
     entries.filter(hasPos).forEach(en => {
       const el = els.get(en.id);
       const w = el.offsetWidth + M*2, h = el.offsetHeight + M*2;
-      const p = nearestFree(en.x - M, en.y - M, w, h, taken, W, H);
-      taken.push({ x: p.x, y: p.y, w, h });
+      const p = nearestFree(en.x - M, en.y - M, w, h, ui, W, H);
+      taken.push({ x: p.x, y: p.y, w, h });   // new cards still look for a free spot
       place(el, p.x + M, p.y + M);
     });
 
@@ -991,6 +666,12 @@
     const rel = n === 0 ? 'today' : n === 1 ? 'tomorrow' : n < 0 ? `${-n}d overdue` : `in ${n}d`;
     const wd = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(...en.date.split('-').map((v,i)=>i===1?Number(v)-1:Number(v))).getDay()];
     date.textContent = page === TODO_PAGE ? `added ${wd} ${en.date}` : `${wd} ${en.date}`;
+    if (page !== TODO_PAGE) {
+      const r = document.createElement('span');
+      r.className = 'rel';
+      r.textContent = ` · ${rel}`;
+      date.appendChild(r);
+    }
     // card plates: countdown on the left, rank tile on the right (SS today/overdue, S this week, A this month, B later)
     const dnum = document.createElement('span');
     dnum.className = 'dnum';
@@ -1031,11 +712,13 @@
   }
 
   // ---------- drag ----------
+  let zTop = 1;
   function enableDrag(el, en) {
     let start = null;
     el.addEventListener('pointerdown', e => {
       if (e.button !== 0) return;
       el.setPointerCapture(e.pointerId);
+      el.style.zIndex = ++zTop;   // the card you touch comes to the front
       start = { px: e.clientX, py: e.clientY, x: el._pos.x, y: el._pos.y, moved: false };
       el.classList.add('dragging');
     });
@@ -1055,14 +738,12 @@
       const wasMoved = start.moved;
       start = null;
       if (!wasMoved) return;
-      // Settle: resolve any overlap with other cards or the buttons.
+      // Settle: a card may be dropped on top of other cards (it stays in front);
+      // it is only pushed off the buttons so they stay clickable.
       const { W, H } = bounds();
       const M = FLOAT_AMP + GAP / 2;
       const w = el.offsetWidth + M*2, h = el.offsetHeight + M*2;
       const taken = obstacles();
-      canvas.querySelectorAll('.entry').forEach(o => {
-        if (o !== el) taken.push({ x: o._pos.x - M, y: o._pos.y - M, w: o.offsetWidth + M*2, h: o.offsetHeight + M*2 });
-      });
       const p = nearestFree(parseFloat(el.style.left) - M, parseFloat(el.style.top) - M, w, h, taken, W, H);
       place(el, p.x + M, p.y + M);
       en.x = Math.round(p.x + M); en.y = Math.round(p.y + M);

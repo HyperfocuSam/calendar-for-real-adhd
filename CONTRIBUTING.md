@@ -13,10 +13,11 @@ user has to make every time they log something, it is probably not for here.
   an importer for a calendar or task tool. Put them in `integrations/`.
 - Accessibility and keyboard-only use.
 - Ports of `todo` (the CLI) to other shells.
+- Skins: one CSS file in `skins/`, one line in `index.html`. See `skins/README.md`.
 
 **How**
 
 1. Zero dependencies stays zero. `server.js` is Node 18+ stdlib only;
-   `index.html` is one file with no build step.
+   `index.html` is one file with no build step (plus the CSS files in `skins/`).
 2. Keep the data files human-readable JSON. People will edit them by hand.
 3. Run it, click it, cross a card out, reload. If that still works, open the PR.

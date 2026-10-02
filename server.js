@@ -315,6 +315,7 @@ const server = http.createServer(async (req, res) => {
         const body = await readBody(req);
         const next = { ...readSettings() };
         if (typeof body.floating === 'boolean') next.floating = body.floating;
+        if (typeof body.skin === 'string' && /^[a-z0-9-]{1,40}$/.test(body.skin)) next.skin = body.skin;
         await writeJson(SETTINGS_FILE, next);
         return send(res, 200, next);
       }
@@ -327,10 +328,15 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true, dir: DATA_DIR, counts, done: readDone().length, settings: readSettings() });
     }
 
-    // Static: only index.html is served.
+    // Static: index.html and the skins/*.css it links.
     if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
       const html = fs.readFileSync(path.join(ROOT, 'index.html'));
       return send(res, 200, html, 'text/html');
+    }
+    const skin = req.method === 'GET' && url.pathname.match(/^\/skins\/([a-z0-9-]{1,40})\.css$/);
+    if (skin) {
+      const file = path.join(ROOT, 'skins', skin[1] + '.css');
+      if (fs.existsSync(file)) return send(res, 200, fs.readFileSync(file), 'text/css');
     }
 
     send(res, 404, { error: 'not found' });

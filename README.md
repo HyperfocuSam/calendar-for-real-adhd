@@ -65,8 +65,9 @@ touch positions, never mark anything done unless I said so.
    The date line shows the weekday (`Wed 2026-09-23 · in 2d`).
 
 3. New cards are auto-placed in clusters by date frame (soon on the left, later in
-   the middle, far on the right). Cards never overlap.
-4. Drag any card anywhere. Press **SAVE** (bottom-left, or Cmd/Ctrl+S) to store the
+   the middle, far on the right). New cards never land on each other.
+4. Drag any card anywhere, on top of another card too if you want them stacked;
+   the card you touch comes to the front. Cards are only kept off the buttons. Press **SAVE** (bottom-left, or Cmd/Ctrl+S) to store the
    new positions. Hover a card and click **×** to mark it done — it leaves the
    canvas and goes to the **CLOCK** list.
 5. **Double-click a card** to edit its text or day in place. The edit dialog also
@@ -102,6 +103,15 @@ is nudged into view without altering the stored position.
 **FLOAT ON / OFF** (bottom-right) toggles the gentle drifting motion for all
 cards. The choice is stored in `data/settings.json` and applies to every page.
 
+### Skins
+
+**SKIN** (bottom-right) changes the look. It ships with `classic` (the white page
+above) and `arcade` (sky, grass, glossy buttons, cards with a countdown and a
+rank, after the lobby screens of early-2000s Korean arcade games). A skin is one
+CSS file in `skins/`; add your own in two steps, see [skins/README.md](skins/README.md).
+
+![Arcade skin](docs/skins/arcade.png)
+
 ## Dependability
 
 - The backend (`server.js`, Node 18+, zero dependencies) is the source of truth.
@@ -136,7 +146,7 @@ data/
 ├── entries-2.json      page 2 · Reminders
 ├── entries-3.json      page 3 · Agent (inbox from the agent)
 ├── done.json           shared CLOCK archive (all pages)
-├── settings.json       { "floating": true }
+├── settings.json       { "floating": true, "skin": "classic" }
 ├── backups/            pageN-YYYY-MM-DD.json and done-YYYY-MM-DD.json, 30 days
 └── server.log
 ```
@@ -163,8 +173,8 @@ POST   /api/entries/:id/done { "x"?, "y"? }   move live card into done.json
 GET    /api/done             newest first; each row includes "page"
 POST   /api/done/:id/revert  restore to original page at saved x,y
 DELETE /api/done/:id         throw away for good
-GET    /api/settings         { "floating": true }
-PUT    /api/settings         { "floating": false }
+GET    /api/settings         { "floating": true, "skin": "classic" }
+PUT    /api/settings         { "floating"?: false, "skin"?: "arcade" }
 GET    /api/health           counts per page + done count + settings
 ```
 
@@ -174,6 +184,7 @@ GET    /api/health           counts per page + done count + settings
 AGENTS.md                   how an agent should feed the canvas
 todo                        tiny CLI over the API
 index.html                  the whole frontend (no build step)
+skins/                      one CSS file per look; add yours here
 server.js                   backend + static server
 data.example/               dummy data, seeded into data/ on first run
 start.command               macOS launcher

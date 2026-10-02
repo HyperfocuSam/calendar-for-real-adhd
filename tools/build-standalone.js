@@ -35,6 +35,7 @@ const shim = `
   try { S = JSON.parse(localStorage.getItem(KEY)); } catch {}
   if (!S || !S.pages) S = { pages: { 0: [], 1: [], 2: [], 3: [] }, done: [], settings: SEED.settings || { floating: true }, tomb: [] };
   S.tomb = S.tomb || [];
+  if (!S.settings.skin && SEED.settings && SEED.settings.skin) S.settings.skin = SEED.settings.skin;   // first build with skins: take the server copy's choice
   const save = () => localStorage.setItem(KEY, JSON.stringify(S));
 
   // merge the seed: add unknown cards, refresh text/date when the seed is newer,
@@ -73,7 +74,11 @@ const shim = `
     if (p === '/api/health') return json(200, { ok: true, dir: 'localStorage', counts: { 0: S.pages[0].length, 1: S.pages[1].length, 2: S.pages[2].length, 3: S.pages[3].length }, done: S.done.length, settings: S.settings, standalone: true, seededAt: S.seededAt });
     if (p === '/api/settings') {
       if (method === 'GET') return json(200, S.settings);
-      if (method === 'PUT') { if (typeof body.floating === 'boolean') S.settings.floating = body.floating; save(); return json(200, S.settings); }
+      if (method === 'PUT') {
+        if (typeof body.floating === 'boolean') S.settings.floating = body.floating;
+        if (typeof body.skin === 'string') S.settings.skin = body.skin;
+        save(); return json(200, S.settings);
+      }
       return json(405, { error: 'method not allowed' });
     }
     if (p === '/api/done') {
@@ -173,6 +178,11 @@ const shim = `
 `;
 
 let html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+// inline every skin, so the file still works on its own
+html = html.replace(/<link rel="stylesheet" href="skins\/([a-z0-9-]+)\.css"([^>]*)>/g, (m, name, attrs) => {
+  const css = fs.readFileSync(path.join(ROOT, 'skins', name + '.css'), 'utf8').replace(/<\/style/gi, '<\\/style');
+  return `<style${attrs}>\n${css}</style>`;
+});
 const seedJs = JSON.stringify(seed).replace(/<\/script/gi, '<\\/script');
 const marker = '<script>';
 const at = html.indexOf(marker);
